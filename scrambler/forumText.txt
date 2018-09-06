@@ -1,0 +1,36 @@
+These weekly competitions are sponsored by [url="http://www.thecubicle.us"]TheCubicle.us[/url] - check them out for all your speedcubing needs.
+
+Each week, a random competitor will be drawn and given a $15 giftcard to TheCubicle.us (winner's prize must be claimed within 30 days).
+
+For the weekly competition, we are accepting results either of two ways:
+1. Use http://www.speedsolving.com/competitions/. You will need to log in; please use the same username that you use on speedsolving.com! (You may feel free to use a different password, but use the same username.) Hopefully use of the website to enter your times will be self-explanatory, please post here or email Mats (mats.bergsten 'at' gmail.com) if you have questions.
+2. Post here, as usual.
+
+If you have posts in both places, we will give priority to posts within the thread, in case there are difficulties with the website.
+
+We follow the [url="http://www.worldcubeassociation.org/regulations/"]WCA regulations[/url] for all events. Here are some things that people often don't know, or are different from the regulations:
+
+[LIST]
+[*]For Multi-BLD you can choose how many cubes you are going to do (let me know if 60 scrambles is not enough). If you attempt 5 cubes you must use the first 5 scrambles.
+[*]For one-handed and with feet you can use both hands during inspection.
+[*]For 3x3x3 Fewest Moves there is a 1 hour time limit.  Provide an explanation in the comments describing how you arrived at your solution.
+[*]For relay you have 15 seconds of inspection in total, you can use any order to solve the cubes and the rest of the relay-rules should be obvious.
+[*]6x6x6 and 7x7x7 will use an average of 5.
+[/LIST]
+
+Notation and scrambling:
+[LIST]
+[*]For all events (other than skewb) the [url="http://www.cubing.net/mark2/"]Mark2[/url] scrambler will be used.
+[*]For 4x4x4 and 5x5x5, a "w" means "Wide" so you turn not just the slice, but also the outer layer.
+[*]For 6x6x6 and 7x7x7, a number before the letter indicates the amount of layers to turn like a wide turn. "3U2" would mean "turn the 3 uppermost layers a half turn".
+[*]For Megaminx, [url="http://www.stefan-pochmann.info/spocc/other_stuff/tools/scramble_megaminx/"]Pochmann notation[/url] will be used.
+[*]For Square-1, 2x2x2, and 3x3x3, near-optimal random state scrambles will be used.
+[*]For Square1, the newest official scrambler is being used. This adds a slash whenever a slice move is to be applied.
+[*]For Clock, a shortened version of the [url="http://www.speedsolving.com/wiki/index.php/Clock_Notation"]official notation[/url] is used.
+[*]For Pyraminx, small letters are for the tips
+[*]Skewb scrambles are generated using Chen Shuang's scrambler, which uses [url="http://meep.cubing.net/skewb-fcn.html"]Fixed Corner Notation[/url].
+[*]Kilominx scrambles uses the notation for Megaminx.
+[/LIST]
+
+This competition starts now and ends Monday/Tuesday nightchange GMT (officially).  Automated results will close at the official time, but if you are slightly late, go ahead and post your results here and we will include them at our discretion if we think it's reasonable.
+ 

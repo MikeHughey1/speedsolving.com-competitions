@@ -1,0 +1,13 @@
+/nbproject
+/.gitbackup
+/error_log
+/newconnect.php
+/changeName.php
+/jwt.php
+/token.php
+/scrambler/databaseTest.php
+/scrambler/error_log
+/scrambler/forum.sql
+/scrambler/index.php
+/scrambler/mb*.php
+/scrambler/oldweekly.php
