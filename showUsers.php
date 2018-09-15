@@ -8,61 +8,68 @@
 <meta name='viewport' content='width=device-width, initial-scale=1'>
 <meta charset="UTF-8">
 
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-1539656-3"></script>
 <script>
-var userIds = [];
-var userTags = [];
-var userNames = [];
-var competitions = [];
-var completedSolves = [];
-var readyToSort = false;
-function initTable() {
-    document.getElementById('sortingIndicator').style.visibility = 'visible';
-    table = document.getElementById("nameSortTable");
-    rows = table.getElementsByTagName("tr");
-    for (i = 1; i < rows.length; i++) {
-        userIds[i] = i;
-        userTags[i] = rows[i].getElementsByTagName("td")[0].innerHTML;
-        userNames[i] = rows[i].getElementsByTagName("td")[0].innerText.toUpperCase();
-        competitions[i] = rows[i].getElementsByTagName("td")[1].innerHTML;
-        completedSolves[i] = rows[i].getElementsByTagName("td")[2].innerHTML;
-    }
-    readyToSort = true;
-    document.getElementById('sortingIndicator').style.visibility = 'hidden';
-}
-function sortTable(n) {
-    // Can't sort until all the data has been loaded.  This makes sure we don't.
-    if (!readyToSort) return;
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'UA-1539656-3');
 
-    document.getElementById('sortingIndicator').innerHTML = 'Sorting...';
-    document.getElementById('sortingIndicator').style.visibility = 'visible';
-    setTimeout(sortTableBegin, 10, n);
-}
+    var userIds = [];
+    var userTags = [];
+    var userNames = [];
+    var competitions = [];
+    var completedSolves = [];
+    var readyToSort = false;
+    function initTable() {
+        document.getElementById('sortingIndicator').style.visibility = 'visible';
+        table = document.getElementById("nameSortTable");
+        rows = table.getElementsByTagName("tr");
+        for (i = 1; i < rows.length; i++) {
+            userIds[i] = i;
+            userTags[i] = rows[i].getElementsByTagName("td")[0].innerHTML;
+            userNames[i] = rows[i].getElementsByTagName("td")[0].innerText.toUpperCase();
+            competitions[i] = rows[i].getElementsByTagName("td")[1].innerHTML;
+            completedSolves[i] = rows[i].getElementsByTagName("td")[2].innerHTML;
+        }
+        readyToSort = true;
+        document.getElementById('sortingIndicator').style.visibility = 'hidden';
+    }
+    function sortTable(n) {
+        // Can't sort until all the data has been loaded.  This makes sure we don't.
+        if (!readyToSort) return;
 
-function sortTableBegin(n) {
-    table = document.getElementById("nameSortTable");
-    switch (n) {
-        case 0:
-            userIds.sort(function(a, b) {return a - b;});
-            break;
-        case 1:
-            userIds.sort(function(a, b) {return competitions[b] - competitions[a];});
-            break;
-        case 2:
-            userIds.sort(function(a, b) {return completedSolves[b] - completedSolves[a];});
-            break;
+        document.getElementById('sortingIndicator').innerHTML = 'Sorting...';
+        document.getElementById('sortingIndicator').style.visibility = 'visible';
+        setTimeout(sortTableBegin, 10, n);
     }
-    rows = table.getElementsByTagName("tr");
-    rows[0].getElementsByTagName("th")[0].innerHTML = (n == 0) ? "Name &#9660;" : "Name";
-    rows[0].getElementsByTagName("th")[1].innerHTML = (n == 1) ? "Competitions &#9660;" : "Competitions";
-    rows[0].getElementsByTagName("th")[2].innerHTML = (n == 2) ? "Completed Solves &#9660;" : "Completed Solves";
-    
-    for (i = 1; i < rows.length; i++) {
-        rows[i].getElementsByTagName("td")[0].innerHTML = userTags[userIds[i-1]];
-        rows[i].getElementsByTagName("td")[1].innerHTML = competitions[userIds[i-1]];
-        rows[i].getElementsByTagName("td")[2].innerHTML = completedSolves[userIds[i-1]];
+
+    function sortTableBegin(n) {
+        table = document.getElementById("nameSortTable");
+        switch (n) {
+            case 0:
+                userIds.sort(function(a, b) {return a - b;});
+                break;
+            case 1:
+                userIds.sort(function(a, b) {return competitions[b] - competitions[a];});
+                break;
+            case 2:
+                userIds.sort(function(a, b) {return completedSolves[b] - completedSolves[a];});
+                break;
+        }
+        rows = table.getElementsByTagName("tr");
+        rows[0].getElementsByTagName("th")[0].innerHTML = (n == 0) ? "Name &#9660;" : "Name";
+        rows[0].getElementsByTagName("th")[1].innerHTML = (n == 1) ? "Competitions &#9660;" : "Competitions";
+        rows[0].getElementsByTagName("th")[2].innerHTML = (n == 2) ? "Completed Solves &#9660;" : "Completed Solves";
+
+        for (i = 1; i < rows.length; i++) {
+            rows[i].getElementsByTagName("td")[0].innerHTML = userTags[userIds[i-1]];
+            rows[i].getElementsByTagName("td")[1].innerHTML = competitions[userIds[i-1]];
+            rows[i].getElementsByTagName("td")[2].innerHTML = completedSolves[userIds[i-1]];
+        }
+        document.getElementById('sortingIndicator').style.visibility = 'hidden';
     }
-    document.getElementById('sortingIndicator').style.visibility = 'hidden';
-}
 </script>
 </head>
 

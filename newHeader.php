@@ -6,7 +6,15 @@
 <meta charset="UTF-8">
 <link rel='stylesheet' href='style.css' type='text/css' />
 <link rel="stylesheet" href="cubing-icons.css">
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-1539656-3"></script>
 <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'UA-1539656-3');
+
     function initialize() {
         configureIndexForMobile();
     }
