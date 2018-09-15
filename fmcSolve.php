@@ -219,46 +219,69 @@ class Cube
    }
 
 
-   function rotation($rot)
-   {
-      // move rotations without move count
-      if ($rot == "x") {
-         $this->move("Rw");
-         $this->move("L'");
-      }
-      else if ($rot == "x'") {
-         $this->move("Rw'");
-         $this->move("L");
-      }
-      else if ($rot == "x2") {
-         $this->move("Rw'"); $this->move("Rw'"); 
-         $this->move("L"); $this->move("L");
-      }
-      else if ($rot == "y") {
-         $this->move("Uw");
-         $this->move("D'");
-      }
-      else if ($rot == "y2") {
-         $this->move("Uw"); $this->move("Uw");
-         $this->move("D'"); $this->move("D'");
-      }
-      else if ($rot == "y'") {
-         $this->move("Uw'");
-         $this->move("D");
-      }
-      else if ($rot == "z") {
-         $this->move("Fw");
-         $this->move("B'");
-      }
-      else if ($rot == "z2") {
-         $this->move("Fw"); $this->move("Fw");
-         $this->move("B'"); $this->move("B'");
-      }
-      else if ($rot == "z'") {
-         $this->move("Fw'");
-         $this->move("B");
-      }
-   }
+    function rotation($rot)
+    {
+        if ($rot[0] === '[') {
+            $isDouble = ($rot[2] === "2");
+            $isCCW = ($rot[2] === "'");  // There was a prime in the original text; note that a move like [r2'] is not allowed by WCA rules
+            switch ($rot[1]) {
+                case 'f': $rot = "z";  break;
+                case 'b': $rot = "z'"; break;
+                case 'u': $rot = "y";  break;
+                case 'd': $rot = "y'"; break;
+                case 'r': $rot = "x";  break;
+                case 'l': $rot = "x'"; break;
+                default: ; // This should never happen because other strings should already be filtered out
+            }
+            if ($isCCW) {
+                // Need to invert the direction of the turn
+                if ($rot[1] === "'") {
+                    $rot = $rot[0];
+                } else {
+                    $rot = $rot."'";
+                }
+            } else if ($isDouble) {
+                $rot = $rot[0]."2";
+            }
+        }
+        // move rotations without move count
+        if ($rot == "x") {
+            $this->move("Rw");
+            $this->move("L'");
+        }
+        else if ($rot == "x'") {
+            $this->move("Rw'");
+            $this->move("L");
+        }
+        else if ($rot == "x2") {
+            $this->move("Rw'"); $this->move("Rw'"); 
+            $this->move("L"); $this->move("L");
+        }
+        else if ($rot == "y") {
+            $this->move("Uw");
+            $this->move("D'");
+        }
+        else if ($rot == "y2") {
+            $this->move("Uw"); $this->move("Uw");
+            $this->move("D'"); $this->move("D'");
+        }
+        else if ($rot == "y'") {
+            $this->move("Uw'");
+            $this->move("D");
+        }
+        else if ($rot == "z") {
+            $this->move("Fw");
+            $this->move("B'");
+        }
+        else if ($rot == "z2") {
+            $this->move("Fw"); $this->move("Fw");
+            $this->move("B'"); $this->move("B'");
+        }
+        else if ($rot == "z'") {
+            $this->move("Fw'");
+            $this->move("B");
+        }
+    }
 
    function checkSolved() {
       // checks if solved on an already oriented cube
@@ -296,11 +319,12 @@ function solution($cube, $scr)
    $marr = explode(' ', $scr);
    foreach ($marr as $m) {
       // treat rotations as two moves which do not affect move count
-      if (stripos("xyz", $m[0]) === false) {
+      if ((stripos("xyz", $m[0]) !==  false) || ($m[0] === '[')) {
+         $cube->rotation($m);
+      }
+      else {
          $mvN += $cube->move($m);
       }
-      else 
-         $cube->rotation($m);
    }
    return $mvN;
 }
@@ -330,7 +354,7 @@ function FMCsolve($scramble, $solve)
 
 function correct_lowercase_move($move)
 {
-    return strtoupper($move[0])."w";
+    return $move[1].strtoupper($move[2])."w".$move[3];
 }
 
 function correct_solution($solve)
@@ -341,8 +365,12 @@ function correct_solution($solve)
     // Replace unusual quotes or i's (inverse) with the normal quote
     $solve = str_replace(array("’", "‘", "´", "i"), "'", $solve);
     
+    // Remove unnecessary spaces between brackets for bracketed rotations
+    $solve = preg_replace("/\[\s+/", "[", $solve);
+    $solve = preg_replace("/\s+\]/", "]", $solve);
+    
     // Convert lowercase moves to uppercase wide moves - this is an experiment
-    $solve = preg_replace_callback("/[lrudfb]/", correct_lowercase_move, $solve);
+    $solve = preg_replace_callback("/([^\[]|^)([lrudfb])([^\]]|$)/", correct_lowercase_move, $solve);
 
     // Convert slice moves to 2 non-slice moves
     $solve = str_replace("M2", "Lw2 L2", $solve);
