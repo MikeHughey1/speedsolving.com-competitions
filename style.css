@@ -187,7 +187,7 @@ a.hover {
 }
 #main-nav ul li {
     border: none;
-    background: #2e5d86;	
+    background: linear-gradient(to bottom, #416b90 0%, #1f517c 100%);
     color: #fcfcfc;
     display: block;
     float: left;
@@ -216,7 +216,7 @@ a.hover {
 }
 
 #main-nav ul li.final:hover {
-    background: #2e5d86;
+    background: linear-gradient(to bottom, #416b90 0%, #1f517c 100%);
 }
 
 .fit { /* set relative picture size */
@@ -670,7 +670,7 @@ a.myLink:hover, a.myLink:active {
 }
 #stats-nav ul li {
     border: none;
-    background: #2e5d86;	
+    background: linear-gradient(to bottom, #416b90 0%, #1f517c 100%);
     color: #fcfcfc;
     display: block;
     float: left;
@@ -693,7 +693,7 @@ a.myLink:hover, a.myLink:active {
 }
 
 #stats-nav ul li.final:hover {
-    background: #2e5d86;
+    background: linear-gradient(to bottom, #416b90 0%, #1f517c 100%);
 }
 
 #stats-nav .dropdown-content {
