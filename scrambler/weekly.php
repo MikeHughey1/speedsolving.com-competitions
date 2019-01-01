@@ -4,8 +4,8 @@ require_once '../newconnect.php';
 $weekNo = $_GET['week'];
 $yearNo = $_GET['year'];
 
-if (!isset($weekNo)) $weekNo = 13;
-if (!isset($yearNo)) $yearNo = 2018;
+if (!isset($weekNo)) exit;
+if (!isset($yearNo)) $yearNo = 2019;
 
 // check if there already are scrambles for this week
 // if there are print them and quit
@@ -41,9 +41,10 @@ if ($row > 10) {
 <script src="scramble_minx.js"></script>
 <script src="scramble_sq1.js"></script>
 <script src="scramble_clock.js"></script>
-<script src="scramble_skewb.js"></script>
+<script src="skewb_solver.js"></script>
 <script src="mersennetwister.js"></script> <!-- randomness -->
 
+<?php require 'rediscrambler.js'; ?>
 <script>
 // list of eventId of all events in the database and then also in the forum weekly comps. 
 /* 1=222 2=333 3=444 4=555 5=666 6=777
@@ -51,6 +52,7 @@ if ($row > 10) {
    14=333oh 15=333feet 16=333mts 17=333fmc
    18=234relay 19=2345relay 20=23456relay 21=234567relay
    22=clock 23=mega 24=pyra 25=sq1 26=skewb 27=kilo 28=MiniGuildford
+   29=magic 30=mmagic 31=snake 32=444fmc 33=redi 34=mpyra
  */
 
 // stolen from http://www.ozoneasylum.com/5782
@@ -62,6 +64,45 @@ function randInt(n)
 // generates a random number (int) in [0, n-1]
 {
    return Math.floor(Math.random() * n);
+}
+
+function masterPyraminxScramble(){
+    // generates the text for one Master Pyraminx scramble
+    var s = "";
+    var len = 40;
+    var turns = [["Uw","U"],["Rw","R"],["Lw","L"],["Bw","B"]];
+    var suffixes =["","'"];
+    var tips = [["", " u", " u'"], ["", " r", " r'"], ["", " l", " l'"], ["", " b", " b'"]];
+    var used = [[0, 0], [0, 0], [0, 0], [0, 0]];
+    var lastaxis = -1;
+    for (j = 0; j < len; j++) {
+        var done = 0;
+        do {
+            var first = Math.floor(Math.random() * turns.length);
+            var second = Math.floor(Math.random() * turns[first].length);
+            if (first !== lastaxis && second === 0) {
+                used[first][0] = 0;
+                for (k = 0; k < turns.length; k++) {
+                    if (k !== first) {
+                        used[first][k] = 0;
+                    }
+                }
+                lastaxis = first;
+            }
+            if (used[first][second] === 0) {
+                used[first][second] = 1;
+                s += turns[first][second] + suffixes[Math.floor(Math.random() * suffixes.length)];
+                if (j < len - 1) {
+                    s += " ";
+                }
+                done = 1;
+            }
+        } while (done === 0);
+    }
+    for (i = 0; i < tips.length; i++) {
+        s += tips[i][Math.floor(Math.random() * 3)];
+    }
+    return s;
 }
 
 function kiloScramble(kilo) {
@@ -107,35 +148,6 @@ function clockScramble(clock) {
          ss += final_pins[i]+"&nbsp;", "";
    }
    return ss;
-}
-
-function checkSkewbScramble(scramble)
-// checks for cancelling or dumb moves (U U' or L L)
-{
-   var a, arr, i, mem, ok;
-   arr = scramble.split(' ');
-   mem = ' ';
-   ok = true;
-   for (i=0; i<arr.length; i++) {
-      a = arr[i].substr(0, 1);
-      if (a == mem) {
-         ok = false;
-         if (a == 'L')
-            arr[i] = 'R';
-         else if (a == 'R')
-            arr[i] = 'B';
-         if (a == 'B')
-            arr[i] = 'U';
-         if (a == 'U')
-            arr[i] = 'L';
-         a = arr[i].substr(0, 1);
-      }
-      mem = a;
-   }
-   if (ok) 
-      return scramble;
-   scramble = arr.join(' ');
-   return scramble;
 }
 
 function bld3scramble()
@@ -259,7 +271,7 @@ function showScramble() {
                   evNr: [1, 7, 18, 19, 20, 21, 28 ] } );
    puzzle.push( { nam: "333", 
                   out: "3scramble|",
-                  nScr: [5, 3, 60,  5,  5,  5,  1,  1,  1,  1,  1,  2 ],
+                  nScr: [5, 3, 60,  5,  5,  5,  3,  1,  1,  1,  1,  2 ],
                   evNr: [2, 8, 13, 14, 15, 16, 17, 18, 19, 20, 21, 28 ] } );
    puzzle.push( { nam: "444", 
                   out: "4scramble|",
@@ -301,12 +313,22 @@ function showScramble() {
                   out: "kiloscramble|",
                   nScr: [ 5 ], 
                   evNr: [27 ] } );
+   puzzle.push( { nam: "redi", 
+                  out: "rediscramble|",
+                  nScr: [ 5 ], 
+                  evNr: [33 ] } );
+   puzzle.push( { nam: "mpyra", 
+                  out: "mpyrascramble|",
+                  nScr: [ 5 ], 
+                  evNr: [34 ] } );
    var printScr = mike = mikeTXT = "";
-   randomness = new MersenneTwisterObject(new Date().getTime()) // woohooo
-
+   randomness = new MersenneTwisterObject(new Date().getTime());
    
    //generate output boxes for each event
-   for(i=1; i <= 28; i++) {
+   for(i=1; i <= 34; i++) {
+       if (i > 28 && i < 33) {
+           continue;
+       }
       evId = "evId" + i;
       document.getElementById("output").innerHTML += 
          "<input id='" + evId + "' name='" + evId + "'  />";
@@ -315,6 +337,10 @@ function showScramble() {
    // console.log(document.getElementById("output").innerHTML);
 
    // Initialize scramblers and generate scrambles
+    var skewbScrambler = skewbSolver();
+    skewbScrambler.init(randomness);
+    var rediScrambler = rediSolver();
+
    // loop over all different puzzles
    for (var p = 0; p < puzzle.length; p++) {
       puzzle[p].output = "";
@@ -327,6 +353,7 @@ function showScramble() {
          ne = puzzle[p].evNr[n];
          pz = puzzle[p].nam;
          evId = "evId" + ne;
+         document.getElementById("status").innerHTML = "Generating " + evId;
          // generate ns scrambles for event ne
          for (var i = 0; i < ns; i++) {
             // one scramble of puzzle puzz
@@ -334,10 +361,12 @@ function showScramble() {
                scramble = clockScramble();
             } else if(pz == "kilo") {
                scramble = kiloScramble();
+            } else if(pz == "mpyra") {
+               scramble = masterPyraminxScramble();
             } else if(pz == "skewb") {
-               scramble = skewb_generate_scramble({minlength:11});
-               scramble = scramble.replace(/D/g, "B");
-               scramble = checkSkewbScramble(scramble);
+               scramble = skewbScrambler.generateScramble();
+            } else if(pz == "redi") {
+               scramble = rediScrambler.generate_scramble_sequence();
             } else if(pz == "333" && (ne == 8 || ne == 13)) {
                // 3-bld or multi-bld, wide turns
                scramble = bld3scramble();
@@ -397,10 +426,11 @@ window.onload = showScramble;
 <div> <!-- display:none -->
 <br /><br />
 <form method='post' id='scrambles' action='uploadScrambles.php'>
-<div id='output'> </div>
+<div id='output'><div id='status'></div> </div>
 <input id='MikeHughey' name='MikeHughey' />
 <input id='MikeTXT' name='MikeTXT' />
-<input id='week' name='week' value='<?php print $_GET['week']; ?>' />
+<input id='week' name='week' value='<?php print $weekNo; ?>' />
+<input id='year' name='year' value='<?php print $yearNo; ?>' />
 
 </form>
 

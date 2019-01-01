@@ -233,12 +233,13 @@
         // running through each event!!!
         foreach ($events as $eventId => $eventName) {
             $weeklyStuff = "weekly" . $eventId . "Time";
-            $solveCount = $events->num_solves($eventId);
+            $solveCount = get_solve_count($eventId, $yearNo);
             $comment = str_ireplace("\n","<br />", $_POST['weeklyComment' . $eventId]);
             unset($average);
             unset($best);
             unset($completedSolves);
             unset($solves);
+            unset($solutions);
             $hasEventData = false;
             $completedSolves = 0;
             $iterCount = $solveCount;
@@ -246,17 +247,50 @@
                 $iterCount = 3; // 3 values to process for multiBLD - cubes succeeded, cubes attempted, time
             }
             for ($i = 1; $i <= $iterCount; ++$i) {
-                if ($eventId == 13 || $eventId == 17) {
-                    $solves[$i] = $_POST[$weeklyStuff.$i];  // Should change this to limit dangerous input
+                if ($eventId == 13) {
+                    $solves[$i] = $_POST[$weeklyStuff.$i];
+                } elseif ($eventId == 17) {
+                    $solutions[$i] = $_POST["weeklySolution".$i];
+                    $explanations[$i] = str_ireplace("\n","<br />", $_POST['weeklySolutionExplanation'.$i]);
+                    //echo $i.": ".$solutions[$i]."<br>".$explanations[$i]."<br>";
                 } else {
                     $solves[$i] = ugly_number($_POST[$weeklyStuff.$i]);  // Need to change so results are sent in proper format
                 }
-                if (ISSET($_POST[$weeklyStuff.$i])) {
+                if (ISSET($_POST[$weeklyStuff.$i]) || ($eventId == 17 && ISSET($_POST["weeklySolution".$i]))) {
                     $hasEventData = true;
                 }
             }
             if (!$hasEventData) {
                 continue;
+            }
+
+            if ($eventId == 17) {
+                // Preprocessor for fewest moves to calculate results and verify solves
+                $explodeScrambles = explode("<br />",get_scramble_text($eventId, $weekNo, $yearNo));
+                $solveNumber = 0;
+                $alertScript = "<script>\n  alert('Fewest Moves:\\n";
+                foreach ($solutions as $solution) {
+                    $scramble = substr($explodeScrambles[$solveNumber], 20);
+                    ++$solveNumber;
+                    if ($solution != "DNF" && $solution != "DNS" && $solution != "" && $scramble != "") {
+                        $solution = correct_solution($solution);
+                        $solves[$solveNumber] = FMCsolve($scramble, $solution);
+                        if ($solves[$solveNumber]) {
+                            // Solution was successful; give message to user indicating the success and number of moves
+                            $alertScript .= "Solve ".$solveNumber." successfully solved in ".$solves[$solveNumber]." moves!\\n";
+                        } else {
+                            $solves[$solveNumber] = 8888;
+                            $solution = "DNF";
+                            $alertScript .= "Solve ".$solveNumber." was not successful; submitted as DNF.\\n";
+                        }
+                    } elseif ($solution == "DNF") {
+                        $solves[$solveNumber] = 8888;
+                    } else {
+                        $solves[$solveNumber] = 9999;
+                    }
+                }
+                $alertScript .= "');\n</script>";
+                echo $alertScript;
             }
 
             if ($eventId == 13) {
@@ -266,12 +300,12 @@
                 if ($time == 'DNF') {
                    $result = 8888;
                    $solves = array (1 => 999999999);
-                } else if (is_numeric($suc) && is_numeric($try)) {
+                } elseif (is_numeric($suc) && is_numeric($try)) {
                     $solves = array( 1 => MBLD_to_number($suc, $try, $time));
                     $result = 2 * $suc - $try;
                     if ($result < 0 || ($result == 0 && $try == 2)) {
                         $result = 8888; 
-                    } else if ($try < 2) {
+                    } elseif ($try < 2) {
                         $result = 9999;
                     } else {
                         $completedSolves = 1;
@@ -283,37 +317,6 @@
                    $solves[1] = 0;
                 }
                 $best = $solves[1];
-            } elseif ($eventId == 17) {
-                // FMC is lovely
-                $scramble = substr(get_scramble_text($eventId, $weekNo, $yearNo), 20);
-                if ($solves[1] != "DNF" && $solves[1] != "DNS" && $solves[1] != "" && $scramble != "") { // new code to check solves
-                    $solves[1] = correct_solution($solves[1]);
-                    $result = FMCsolve($scramble, $solves[1]);
-                    if ($result) {
-                        // Solution was successful; give message to user indicating the success and number of moves
-                        echo <<<END
-                        <script> 
-                            alert("Fewest Moves: Successfully solved in "+$result+" moves!");
-                        </script>
-END;
-                    } else {
-                        $comment = str_ireplace("\n", "<br />", "[mod: changed to DNF because submitted solution did not solve the puzzle. Original submitted solution:\n".$solves[1]."]\n").$comment;
-                        $result = 8888;
-                        $solves[1] = "DNF";
-                        echo <<<END
-                        <script> 
-                            alert("Fewest Moves: Solution was not successful; submitted as DNF.  Original solution included in comments for solve.");
-                        </script>
-END;
-                    }
-                } else {
-                    $result = countMoves($solves[1]);
-                }
-                $solves = array(1 => $solves[1]);
-                $best = $result;
-                if ($result > 0) {
-                    $completedSolves = 1;
-                }
             } elseif ($solveCount == 5) {
                 $completedSolves = 0;
                 // count if we should calculate avg
@@ -351,21 +354,27 @@ END;
                         $solves[$m] = 9999;
                     }
                 }
-                $result = get_best_result($solveCount, $solves);
-                $best = $result;
+                $best = get_best_result($solveCount, $solves);
                 if ($completedSolves == $solveCount) {
                     $average = round_score(array_sum($solves) / 3);
                 } else {
                     $average = PHP_INT_MAX;
                 }
+                if ($eventId == 17) {
+                    // Fewest moves winner is determined by mean of 3
+                    if ($average != PHP_INT_MAX) {
+                        $result = $average;
+                    } else {
+                        $result = 8888;
+                    }
+                } else {
+                    $result = $best;
+                }
             } elseif ($solveCount == 1) {
-                $result = get_best_result($solveCount, $solves);
-                $best = $result;
+                $best = get_best_result($solveCount, $solves);
+                $result = $best;
                 if (is_valid_score($result)) {
                    ++$completedSolves;
-                }
-                if ($eventId == 17) {
-                    number_format($result, 0, '.', '');
                 }
             }
             if ($best == 8888) {
@@ -373,7 +382,7 @@ END;
             }
             // average and best are expressed in centiseconds so they can be accurate as integers in the database
             if ($average != PHP_INT_MAX) {
-                $average *= 100;
+                $average = round($average * 100);
             }
             if ($best != PHP_INT_MAX && $eventId != 13 && $eventId != 17) {
                 $best *= 100;
@@ -387,12 +396,14 @@ END;
                     $solve = uglyNumber($solve);
                 }
                 $k++;
+                $solveId= "solve" . $k;
                 if ($existence == 0) { // If row doesn't already exist
-                    $solveId= "solve" . $k;
                     if ($solve) {
                         if ($eventId != 13 && $eventId != 17) {
                             $statement = $mysqli->prepare("INSERT INTO weeklyResults ($solveId, weekId, yearId, eventId, userId) VALUES (?, ?, ?, ?, ?)");
                             $statement->bind_param("diiii", $solve, $weekNo, $yearNo, $eventId, $userId);
+                            $statement->execute();
+                            $statement->close();
                             $existence = 1;
                         } elseif ($eventId == 13) {
                             if ($solve == 8888){
@@ -400,34 +411,57 @@ END;
                             }
                             $statement = $mysqli->prepare("INSERT INTO weeklyResults (multiBLD, weekId, yearId, eventId, userId) VALUES (?, ?, ?, ?, ?)");
                             $statement->bind_param("iiiii", $solve, $weekNo, $yearNo, $eventId, $userId);
+                            $statement->execute();
+                            $statement->close();
                         } elseif ($eventId == 17) {
-                            $statement = $mysqli->prepare("INSERT INTO weeklyResults (fmcSolution, weekId, yearId, eventId, userId) VALUES (?, ?, ?, ?, ?)");
-                            $statement->bind_param("siiii", $solve, $weekNo, $yearNo, $eventId, $userId);
+                            $statement = $mysqli->prepare("INSERT INTO weeklyResults (fmcSolution, $solveId, weekId, yearId, eventId, userId) VALUES (?, ?, ?, ?, ?, ?)");
+                            $statement->bind_param("siiiii", $solutions[$k], $solve, $weekNo, $yearNo, $eventId, $userId);
+                            $statement->execute();
+                            $statement->close();
+                            $statement = $mysqli->prepare("INSERT INTO weeklyFmcSolves (yearId, weekId, userId, eventId, solveId, moves, solution, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                            $statement->bind_param("iiiiiiss", $yearNo, $weekNo, $userId, $eventId, $k, $solve, $solutions[$k], $explanations[$k]);
+                            $statement->execute();
+                            $statement->close();
+                            $existence = 1;
                         }
-                        $statement->execute();
-                        $statement->close();
                    }
                 } else { // If row exists
                     if($eventId != 13 && $eventId != 17) {
-                        $solveId= "solve" . $k;
                         $statement = $mysqli->prepare("UPDATE weeklyResults SET $solveId = ? WHERE weekId = ? AND yearId = ? AND eventId = ? AND userId = ?");
                         $statement->bind_param("diiii", $solve, $weekNo, $yearNo, $eventId, $userId);
+                        $statement->execute();
+                        $statement->close();
                     } elseif ($eventId == 13) {
                         if ($solve == 8888) { $solve = 999999999; }
                         $statement = $mysqli->prepare("UPDATE weeklyResults SET multiBLD = ? WHERE weekId = ? AND yearId = ? AND eventId = ? AND userId = ?");
                         $statement->bind_param("iiiii", $solve, $weekNo, $yearNo, $eventId, $userId);
+                        $statement->execute();
+                        $statement->close();
                     } elseif ($eventId == 17) {
-                        $statement = $mysqli->prepare("UPDATE weeklyResults SET fmcSolution = ? WHERE weekId = ? AND yearId = ? AND eventId = ? AND userId = ?");
-                        $statement->bind_param("siiii", $solve, $weekNo, $yearNo, $eventId, $userId);
+                        $statement = $mysqli->prepare("UPDATE weeklyResults SET fmcSolution = ?, $solveId = ? WHERE weekId = ? AND yearId = ? AND eventId = ? AND userId = ?");
+                        $statement->bind_param("siiiii", $solutions[$k], $solve, $weekNo, $yearNo, $eventId, $userId);
+                        $statement->execute();
+                        $statement->close();
+                        $fmcExistence = $mysqli->query("SELECT * FROM weeklyFmcSolves WHERE yearId='$yearNo' AND weekId='$weekNo' AND userId='$userId' AND eventId='$eventId' AND solveId='$k'")->num_rows;
+                        if ($fmcExistence === 0) {
+                            $statement = $mysqli->prepare("INSERT INTO weeklyFmcSolves (yearId, weekId, userId, eventId, solveId, moves, solution, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                            $statement->bind_param("iiiiiiss", $yearNo, $weekNo, $userId, $eventId, $k, $solve, $solutions[$k], $explanations[$k]);
+                            $statement->execute();
+                            $statement->close();
+                        } else {
+                            $statement = $mysqli->prepare("UPDATE weeklyFmcSolves SET solution = ?, comment = ?, moves = ? WHERE yearId = ? AND weekId = ? AND userId = ? AND eventId = ? AND solveId = ?");
+                            $statement->bind_param("ssiiiiii", $solutions[$k], $explanations[$k], $solve, $yearNo, $weekNo, $userId, $eventId, $k);
+                            $statement->execute();
+                            $statement->close();
+                        }
                     }
-                    $statement->execute();
-                    $statement->close();
                 }
             }
 
             // HAZ DELETE SKILLS!
-            if ($solves[1] == "DNS" || ((($solves[1] < 0.4) && $solves[1]!="DNF") && ($eventId != 17)) || $solves[1] == 9999) {
+            if ($solves[1] == "DNS" || ((($solves[1] < 0.4) && $solves[1] != "DNF") && ($eventId != 17)) || $solves[1] == 9999) {
                 $mysqli->query("DELETE FROM weeklyResults WHERE weekId='$weekNo' AND yearId='$yearNo' AND userId='$userId' AND eventId='$eventId'");
+                $mysqli->query("DELETE FROM weeklyFmcSolves WHERE yearId='$yearNo' AND weekId='$weekNo' AND userId='$userId' AND eventId='$eventId'");
             }
 
             // Add result and comments
@@ -488,10 +522,10 @@ END;
     } elseif ($site=="opretBruger") {
         $side="opretBruger.php";
     } elseif ($site=="weeklySubmit") {
-        if (is_admin()) { $side = "weeklySubmitNew.php"; }
+        if (is_mike()) { $side = "weeklySubmitNew.php"; }
         elseif ($_SESSION['logged_in']) { $side="weeklySubmit.php"; } else { $side="forside.php"; }
     } elseif ($site=="weeklyView") {
-        if (is_admin()) { $side = "weeklyViewNew.php"; }
+        if (is_mike()) { $side = "weeklyViewNew.php"; }
         elseif ($_SESSION['logged_in']) { $side="weeklyView.php"; } else { $side="forside.php"; }
     } elseif ($site=="weeklyShow") {
         $side="showWeekly.php";

@@ -11,7 +11,6 @@
 
 <?php
     require_once 'statFunctions.php';
-    require_once 'readEvents.php';
 
     if (!is_admin()) {
         // Protect against someone inadvertently allowing this code to be called by a non-admin.  This shouldn't ever execute.
@@ -37,7 +36,7 @@
     $row = $query->fetch_assoc();
     $personInfo = get_person_info($user);
     $userFullName = $personInfo['firstName']." ".$personInfo['lastName'];
-    $titleText = $userFullName."(".$user."): ".$eventNames[$eventId].", Week ".$year."-".$week;
+    $titleText = $userFullName."(".$user."): ".$events->name($eventId).", Week ".$year."-".$week;
     $solve1PreviousRaw = $row['solve1'];
     $solve2PreviousRaw = $row['solve2'];
     $solve3PreviousRaw = $row['solve3'];
@@ -76,15 +75,16 @@
         $options = array("options" => array("regexp" => "/[a-zA-Z\ \n]*/"));
         $comment = filter_input(INPUT_POST, 'comment', FILTER_VALIDATE_REGEXP, $options);
         $fmcSolution = filter_input(INPUT_POST, 'fmcSolution', FILTER_VALIDATE_REGEXP, $options);
+        $solveCount = get_solve_count($eventId, $year);
         if ($eventId == 13) {
             $result = number_to_MBLD($multiBLD)[0];
         } elseif ($eventId == 17) {
             $result = count_moves($fmcSolution);
-        } elseif ($solveCounts[$eventId] == 3) {
+        } elseif ($solveCount == 3) {
             // best of 3 event
-            $result = get_best_result($solveCounts[$eventId], array(1=>$solve1, $solve2, $solve3));
+            $result = get_best_result($solveCount, array(1=>$solve1, $solve2, $solve3));
         } else {
-            $result = get_average($solveCounts[$eventId], array(1=>$solve1, $solve2, $solve3, $solve4, $solve5));
+            $result = get_average($solveCount, array(1=>$solve1, $solve2, $solve3, $solve4, $solve5));
         }
         // Reset values for solves that don't belong to this event and shouldn't change
         if ($solve1Old == 0 && $solve1 == 9999) {
@@ -102,7 +102,7 @@
         if ($solve5Old == 0 && $solve5 == 9999) {
             $solve5 = 0;
         }
-        if ($solveCounts[$eventId] == 1) {
+        if ($solveCount == 1) {
             if ($solve2 == 9999) {
                 $solve2 = 0;
             }
@@ -110,7 +110,7 @@
                 $solve3 = 0;
             }
         }
-        if ($solveCounts[$eventId] <= 3) {
+        if ($solveCount <= 3) {
             if ($solve4 == 9999) {
                 $solve4 = 0;
             }

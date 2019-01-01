@@ -38,7 +38,6 @@
 <?php
     require_once 'statsHeader.php';
     require_once 'statFunctions.php';
-    require_once 'readEvents.php';
     
     $userId = filter_input(INPUT_GET, 'showRecords', FILTER_VALIDATE_INT);
     if ($userId == FALSE) {
@@ -56,7 +55,7 @@
     
     $competitionCount = get_competitions($userId);
     $completedSolveCount = get_completed_solves($userId);
-    $kinchScores = get_overall_user_kinch_scores($userId);
+    $kinchScores = get_overall_user_kinch_scores($userId, false);
     $kinchOverallScore = round_score($kinchScores[0]);
     
     print <<<END
@@ -105,9 +104,7 @@ END;
         $comments[$eventId][$comp] = $resultRow['comment'];
         $averageTipString = htmlentities($singleTipString, ENT_QUOTES | ENT_IGNORE, "UTF-8");
         $results[$eventId][$comp] = $resultRow['result'];
-        if ($eventId == '17') {
-            $fmcSolution[$comp] = $resultRow['fmcSolution'];
-        } elseif ($eventId == '13') {
+        if ($eventId == '13') {
             $multiBLD[$comp] = $resultRow['multiBLD'];
             $results[$eventId][$comp] = $resultRow['multiBLD'];
         }
@@ -115,13 +112,19 @@ END;
         $dnf = false;
         $dnf2 = false;
         $singles[$eventId][$comp] = PHP_INT_MAX;
-        for ($i = 1; $i <= $solveCounts[$eventId]; $i++) {
+        $best = $resultRow['best'];
+        $solveCount = get_solve_count($eventId, $year);
+        for ($i = 1; $i <= $solveCount; $i++) {
             $solveVal = $resultRow['solve'.$i];
-            if ($eventId == 13 || $eventId == 17 || $eventId == 32) {
+            if ($eventId == 13 || $eventId == 32) {
                 $solveVal = $results[$eventId][$comp];
             }
             $solves[$eventId][$comp][$i] = $solveVal;
-            if ($solveVal < $singles[$eventId][$pbSingleComp] && is_valid_score($solveVal)) {
+            $previousBestResult = $singles[$eventId][$pbSingleComp];
+            if ($eventId != 13 && $eventId != 17 && $eventId != 32) {
+                $previousBestResult *= 100;
+            }
+            if ($solveVal < $singles[$eventId][$pbSingleComp] && $best < $previousBestResult && is_valid_score($best)) {
                 $pb[$eventId][$comp] = $i;
                 $pbSingleComp = $comp;
             }
@@ -141,21 +144,23 @@ END;
         if ($singles[$eventId][$comp] == PHP_INT_MAX) {
             $singles[$eventId][$comp] = 8888;
         }
-        if ($solveCounts[$eventId] == 5) {
+        if ($solveCount == 5) {
             if ($dnf2) {
                 $avg = 8888;
             } else {
                 // Here we can optionally add code to correct the result if desired; a calculated average here should equal the result
                 $avg = $results[$eventId][$comp];
             }
-        } elseif ($solveCounts[$eventId] == 3) {
+        } elseif ($solveCount == 3) {
             if ($dnf) {
                 $avg = 8888; // DNF
             } else {
                 $avg /= 3;
             }
+        } elseif ($solveCount == 1) {
+            $avg = 0;
         }
-        if ($avg !== 8888 && ($averages[$eventId][$pbAverageComp] == 0 || $avg < $averages[$eventId][$pbAverageComp])) {
+        if ($avg != 0 && $avg !== 8888 && ($averages[$eventId][$pbAverageComp] == 0 || $avg < $averages[$eventId][$pbAverageComp])) {
             $pbA[$eventId][$comp] = true;
             $pbAverageComp = $comp;
         }
@@ -163,7 +168,7 @@ END;
         
         $rankings[$eventId][$comp] = $resultRow['rank'];
         if ($week == get_current_week() && $year == get_current_year()) {
-            $rankings[$eventId][$comp] = calculate_place_ranking_new($eventId, round_score($averages[$eventId][$comp]) * 100, $singles[$eventId][$comp] * 100, $userId, $week, $year);
+            $rankings[$eventId][$comp] = calculate_place_ranking($eventId, $resultRow['average'], $best, $userId, $week, $year);
         }
         if ($rankings[$eventId][$comp] == 1 && is_valid_score($results[$eventId][$comp])) {
             ++$gold;
@@ -174,7 +179,7 @@ END;
         }
         ++$comp;
     }
-    // Store overall results for last event in list (done in loop above fof other events
+    // Store overall results for last event in list (done in loop above for other events
     $overallPBSingle[$eventId] = $pbSingleComp;
     $overallPBAverage[$eventId] = $pbAverageComp;
     
@@ -195,28 +200,29 @@ END;
 END;
 
     print "<tbody>";
-    foreach ($eventNames as $eventId => $eventName) {
+    foreach ($events as $eventId => $eventName) {
         if (count($yearWeeks[$eventId]) == 0) {
             continue;
         } elseif (is_dnf($singles[$eventId][$overallPBSingle[$eventId]]) && is_dnf($averages[$eventId][$overallPBAverage[$eventId]])) {
             continue;
         }
         $pbSingleComp = $overallPBSingle[$eventId];
-        $singleRankString = calculate_single_ranking($eventId, $solveCounts[$eventId], $singles[$eventId][$pbSingleComp], $userId);
-        $solveDetails = get_solve_details($eventId, $solveCounts[$eventId], $solves[$eventId][$pbSingleComp], $results[$eventId][$pbSingleComp], $multiBLD[$pbSingleComp], $fmcSolution[$pbSingleComp], false);
-        $singleTipString = "Week ".$yearWeeks[$eventId][$pbSingleComp]."<br>$solveDetails<br>".$comments[$eventId][$pbSingleComp];
-        $singleOutput = get_single_output($eventId, $singles[$eventId][$overallPBSingle[$eventId]]);
         $pbAverageComp = $overallPBAverage[$eventId];
-        $solveDetails = get_solve_details($eventId, $solveCounts[$eventId], $solves[$eventId][$pbAverageComp], $results[$eventId][$pbAverageComp], $multiBLD[$eventId][$pbAverageComp], $fmcSolution[$eventId][$pbAverageComp], false);
-        $place = 1;
         $weekId = substr($yearWeeks[$eventId][$pbAverageComp], 5);
         $yearId = substr($yearWeeks[$eventId][$pbAverageComp], 0, 4);
+        $solveCount = get_solve_count($eventId, $yearId);
+        $singleRankString = calculate_single_ranking($eventId, $solveCount, $singles[$eventId][$pbSingleComp], $userId);
+        $solveDetails = get_solve_details($eventId, $solveCount, $solves[$eventId][$pbSingleComp], $results[$eventId][$pbSingleComp], $multiBLD[$pbSingleComp], false);
+        $singleTipString = "Week ".$yearWeeks[$eventId][$pbSingleComp]."<br>$solveDetails<br>".$comments[$eventId][$pbSingleComp];
+        $singleOutput = get_single_output($eventId, $singles[$eventId][$overallPBSingle[$eventId]]);
+        $solveDetails = get_solve_details($eventId, $solveCount, $solves[$eventId][$pbAverageComp], $results[$eventId][$pbAverageComp], $multiBLD[$eventId][$pbAverageComp], false);
+        $place = 1;
         $queryRanking = $mysqli->query("SELECT userId FROM weeklyResults WHERE eventId='$eventId' AND weekId='$weekId' AND yearId='$yearId' AND result<'".$averages[$eventId][$pbAverageComp]."' AND userID>='0' AND userId!='$userId'");
         while($placeArr = $queryRanking->fetch_array()){
             $place++;
         }
         $averageTipString = "Week ".$yearWeeks[$eventId][$pbAverageComp]."<br>".get_place_string($place)." Place<br>$solveDetails<br>".$comments[$eventId][$pbAverageComp];
-        $averageRankString = calculate_average_ranking($eventId, $solveCounts[$eventId], $averages[$eventId][$pbAverageComp], $userId);
+        $averageRankString = calculate_average_ranking($eventId, $solveCount, $averages[$eventId][$pbAverageComp], $userId);
 
         print "<tr>";
         print <<<END
@@ -226,7 +232,7 @@ END;
         echo " $eventName</a></td>";
         echo "<td class='r'>$singleRankString</td>";
         echo "<td class='r tooltip'><b><a href='showEvents.php?eventId=$eventId&single=Single' class='myLink'>".$singleOutput."</a></b><span class='tooltiptext'>$singleTipString</span></td>";
-        if ($solveCounts[$eventId] == 1 || is_dnf($averages[$eventId][$pbAverageComp])) {
+        if ($solveCount == 1 || is_dnf($averages[$eventId][$pbAverageComp])) {
             echo "<td></td>";
             echo "<td></td>";
         } else {
@@ -269,7 +275,7 @@ END;
 END;
     print "<ul id='eventSelector'>";
     $first = true;
-    foreach ($eventNames as $eventId => $eventName) {
+    foreach ($events as $eventId => $eventName) {
         if (count($yearWeeks[$eventId]) == 0) {
             continue;
         }
@@ -300,7 +306,7 @@ END;
         </thead>
 END;
 
-    foreach ($eventNames as $eventId => $eventName) {
+    foreach ($events as $eventId => $eventName) {
         if ($eventId == 1) {
             print "<tbody id='event$eventId' class='event-display'>";
         } else {
@@ -326,11 +332,12 @@ END;
             $week = intval(substr($yearWeeks[$eventId][$comp], 5));
             $year = substr($yearWeeks[$eventId][$comp], 0, 4);
             $comment = $comments[$eventId][$comp];
-            $selectEvent = $eventId + 2;
+            $selectEvent = $eventId;
+            $solveCount = get_solve_count($eventId, $year);
             print "<tr>";
             print "<td class='l'><a href='showWeeks.php?week=$week&year=$year&selectEvent=$selectEvent'>".$yearWeeks[$eventId][$comp]."</a></td>";
             print "<td class='r'>".$rankings[$eventId][$comp]."</td>";
-            if ($solveCounts[$eventId] == 1 && strlen($comment) > 0) {
+            if ($solveCount == 1 && strlen($comment) > 0) {
                 print "<td class='r tooltip";
             } else {
                 print "<td class='r";
@@ -340,12 +347,12 @@ END;
             } else {
                 print"'>";
             }
-            if ($solveCounts[$eventId] == 1) {
+            if ($solveCount == 1) {
                 print "<b>".get_single_output($eventId, $singles[$eventId][$comp])."</b><span class='tooltiptext'>".$comment."</span></td>";
             } else {
                 print "<b>".get_single_output($eventId, $singles[$eventId][$comp])."</b></td>";
             }
-            if ($solveCounts[$eventId] == 1) {
+            if ($solveCount == 1) {
                 print "<td></td>";
             } else {
                 if (strlen($comment) > 0) {
@@ -358,7 +365,7 @@ END;
                 } else {
                     print"'>";
                 }
-                $error = (pretty_number(get_average($solveCounts[$eventId], $solves[$eventId][$comp])) == pretty_number($averages[$eventId][$comp])) ? "" : " ERROR (".pretty_number(get_average($solveCounts[$eventId], $solves[$eventId][$comp])).")";
+                $error = (pretty_number(get_average($solveCount, $solves[$eventId][$comp])) == pretty_number($averages[$eventId][$comp])) ? "" : " ERROR (".pretty_number(get_average($solveCount, $solves[$eventId][$comp])).")";
                 if (strlen($comment) > 0) {
                     print "<b>".pretty_number($averages[$eventId][$comp])."$error</b><span class='tooltiptext'>".$comment."</span></td>";
                 } else {
@@ -367,33 +374,33 @@ END;
             }
             $min = 0;
             $max = 0;
-            if ($solveCounts[$eventId] == 5) {
+            if ($solveCount == 5) {
                 $min = get_min($solves[$eventId][$comp]);
                 $max = get_max($solves[$eventId][$comp]);
             }
             $minSet = false;
             $maxSet = false;
-            for ($i = 1; $i <= $solveCounts[$eventId]; $i++) {
-                if ($solveCounts[$eventId] == 1) {
+            for ($i = 1; $i <= $solveCount; $i++) {
+                if ($solveCount == 1) {
                     print "<td></td>";
                     print "<td></td>";
                 }
-                if ($solveCounts[$eventId] == 5 && !$minSet && $solves[$eventId][$comp][$i] == $min) {
+                if ($solveCount == 5 && !$minSet && $solves[$eventId][$comp][$i] == $min) {
                     print "<td>(".get_single_output($eventId, $solves[$eventId][$comp][$i]).")</td>";
                     $minSet = true;
                 }
-                elseif ($solveCounts[$eventId] == 5 && !$maxSet && $solves[$eventId][$comp][$i] == $max) {
+                elseif ($solveCount == 5 && !$maxSet && $solves[$eventId][$comp][$i] == $max) {
                     print "<td>(".get_single_output($eventId, $solves[$eventId][$comp][$i]).")</td>";
                     $maxSet = true;
                 } elseif ($eventId == 13) {
-                    print "<td>".get_solve_details($eventId, 0, 0, 0, $solves[$eventId][$comp][$i], 0, false)."</td>";
+                    print "<td>".get_solve_details($eventId, 0, 0, 0, $solves[$eventId][$comp][$i], false)."</td>";
                 } else {
                     print "<td>".get_single_output($eventId, $solves[$eventId][$comp][$i])."</td>";
                 }
-                if ($solveCounts[$eventId] == 1) {
+                if ($solveCount == 1) {
                     print "<td></td>";
                     print "<td></td>";
-                } elseif ($solveCounts[$eventId] == 3 && $i < 3) {
+                } elseif ($solveCount == 3 && $i < 3) {
                     print "<td></td>";
                 }
             }

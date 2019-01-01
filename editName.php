@@ -11,7 +11,6 @@
 
 <?php
     require_once 'statFunctions.php';
-    require_once 'readEvents.php';
 
     if (!is_admin()) {
         // Protect against someone inadvertently allowing this code to be called by a non-admin.  This shouldn't ever execute.

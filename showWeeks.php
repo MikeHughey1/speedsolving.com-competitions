@@ -27,10 +27,10 @@
     function change_year_week(value)
     {
         var newLocation = value.options[value.options.selectedIndex].value;
-        var showEvent = document.getElementById('showEvent').selectedIndex;
-        if (showEvent > 0) {
-            newLocation += "&selectEvent=";
-            newLocation += showEvent;
+        var showIndex = document.getElementById('showEvent').selectedIndex;
+        if (showIndex > 0) {
+            newLocation += "&selectIndex=";
+            newLocation += showIndex;
         }
         window.location = newLocation;
     }
@@ -62,11 +62,15 @@
     <select id='showEvent' onchange='hideShow(this)'><option value='0'>Pick event...</option>
     <option value='Overall'>Overall score ($numberOfParticipants)</option>
     <option value='Kinch'>Kinch score ($numberOfParticipants)</option>
+    <option value='KinchWca'>Kinch score (WCA events) ($numberOfParticipants)</option>
 END;
 
-    foreach ($events as $eventId) {
+    $eventIndex = 3; // Increase this for every special list above (Overall, Kinch, KinchWca)
+    $eventIndices = []; // Keeps track of where to go for the week to show the right event by index
+    foreach ($events as $eventId => $eventName) {
         if (is_active_event($eventId, $weekNo, $yearNo)) {
-            echo "<option value='event$eventId'>".$events->name($eventId)." (".$weeklyResults->get_participant_count($eventId).")</option>";
+            echo "<option value='event$eventId'>".$eventName." (".$weeklyResults->get_participant_count($eventId).")</option>";
+            $eventIndices[$eventId] = ++$eventIndex;
         }
     }
     echo "</select><br>";
@@ -113,7 +117,12 @@ END;
     foreach ($weeklyResults->get_score_list() as $userId =>$score) {
         $personInfo = get_person_info($userId);
         echo "<tr>";
-        echo "<td class='l'>$place</td>";
+        if (is_admin()) {
+            $email = $personInfo['email'];
+            echo "<td class='l with-pointer' id='$email' onclick='copyToClipboard(this)'>".$place."</td>";
+        } else {
+            echo "<td class='l'>".$place."</td>";
+        }
         echo "<td class='userLink'><a href='showPersonalRecords.php?showRecords=$userId'><b>".$personInfo['displayName']." (".$personInfo['username'].")</b></a></td>";
         echo "<td class='r'>".$weeklyResults->get_attempted_events($userId)."</td>";
         echo "<td class='r'><b>$score</b></td>";
@@ -142,7 +151,12 @@ END;
     foreach ($weeklyResults->get_kinch_scores() as $userId =>$score) {
         $personInfo = get_person_info($userId);
         echo "<tr>";
-        echo "<td class='l'>$place</td>";
+        if (is_admin()) {
+            $email = $personInfo['email'];
+            echo "<td class='l with-pointer' id='$email' onclick='copyToClipboard(this)'>".$place."</td>";
+        } else {
+            echo "<td class='l'>".$place."</td>";
+        }
         echo "<td class='userLink'><a href='showPersonalRecords.php?showRecords=$userId'><b>".$personInfo['displayName']." (".$personInfo['username'].")</b></a></td>";
         echo "<td class='r'>".$weeklyResults->get_attempted_events($userId)."</td>";
         echo "<td class='r'><b>".round_score($score)."</b></td>";
@@ -151,29 +165,61 @@ END;
     }
     echo "</table></div></div>";
 
+    /*** preload WCA-only Kinch rankings ***/
+    print <<<END
+    <div>
+        <div class='weekly-ranking' id='KinchWca'>
+            <div class='xLargeText'><br>Kinch Score (WCA events only)<br></div>
+            <table class='table-striped table-dynamic'>
+                <thead>
+                    <tr>
+                        <th class='l'>#</th>
+                        <th class='l'>Name</th>
+                        <th class='r'>WCA Events</th>
+                        <th class='r'>Kinch Score</th>
+                    </tr>
+                </thead>
+END;
+
+    $place = 1;
+    foreach ($weeklyResults->get_kinch_scores_wca() as $userId =>$score) {
+        $personInfo = get_person_info($userId);
+        echo "<tr>";
+        if (is_admin()) {
+            $email = $personInfo['email'];
+            echo "<td class='l with-pointer' id='$email' onclick='copyToClipboard(this)'>".$place."</td>";
+        } else {
+            echo "<td class='l'>".$place."</td>";
+        }
+        echo "<td class='userLink'><a href='showPersonalRecords.php?showRecords=$userId'><b>".$personInfo['displayName']." (".$personInfo['username'].")</b></a></td>";
+        echo "<td class='r'>".$weeklyResults->get_attempted_events_wca($userId)."</td>";
+        echo "<td class='r'><b>".round_score($score)."</b></td>";
+        echo "</tr>";
+        ++$place;
+    }
+    echo "</table></div></div>";
+
     /*** preload all ranklists ***/
-    foreach ($events as $eventId) {
+    foreach ($events as $eventId => $eventName) {
         if (!is_active_event($eventId, $weekNo, $yearNo)) {
             continue;
         }
-        $eventName = $events->name($eventId);
-        $solveCount = $events->num_solves($eventId);
-        $scrambleText = "";
-        if ($eventId == 17) {
-            // Fewest moves; show scramble that was solved so solutions will make sense
-            $scrambleText = "Scramble: ".get_scramble_text($eventId, $weekNo, $yearNo);
+        $solveCount = get_solve_count($eventId, $yearNo);
+        $resultText = "Result";
+        if (is_fewest_moves($eventId) && get_solve_count($eventId, $yearNo) > 1) {
+            $resultText = "Mean";
         }
         
         print <<<END
         <div>
             <div class='weekly-ranking' id='event$eventId'>
-                <div class='xLargeText'><br>$eventName<br><br>$scrambleText</div>
+                <div class='xLargeText'><br>$eventName<br><br></div>
                 <table class='table-striped table-dynamic'>
                     <thead>
                         <tr>
                             <th class='l'>#</th>
                             <th class='l'>Name</th>
-                            <th class='r'>Result</th>
+                            <th class='r'>$resultText</th>
                             <th class='c'>Solves</th>
                             <th class='comment'>Comment</th>
                         </tr>
@@ -183,21 +229,96 @@ END;
             foreach ($weeklyResults->get_user_places($eventId) as $userId => $place) {
                 $personInfo = get_person_info($userId);
                 echo "<tr>";
-                echo "<td class='l'>".$place."</td>";
+                if (is_admin()) {
+                    $email = $personInfo['email'];
+                    echo "<td class='l with-pointer' id='$email' onclick='copyToClipboard(this)'>".$place."</td>";
+                } else {
+                    echo "<td class='l'>".$place."</td>";
+                }
                 echo "<td class='userLink'><a href='showPersonalRecords.php?showRecords=$userId'><b>".$personInfo['displayName']." (".$personInfo['username'].")</b></a></td>";
                 echo "<td class='r'><b>".$weeklyResults->get_user_result($eventId, $userId)."</b></td>";
                 echo "<td class='c'>".$weeklyResults->get_user_solve_details($eventId, $userId)."</td>";
-                echo "<td class='l'>".$weeklyResults->get_user_comment($eventId, $userId)."</td>";
+                $comment = $weeklyResults->get_user_comment($eventId, $userId);
+                if ($eventId == 17) {
+                    // Need to handle multiple solves here
+                    $solveId = 1;
+                    $fmcResults = $mysqli->query("SELECT solution, comment FROM weeklyFmcSolves WHERE yearId = '$yearNo' AND weekId = '$weekNo' AND userId = '$userId' AND eventId = '$eventId' AND solveId = '$solveId'")->fetch_array();
+                    $solutionExplanation = $fmcResults['comment'];
+                    if ($solutionExplanation != $comment) {
+                        // If these match, it means the comment was copied to the solution temporarily - this code can go away when the move to mean of 3 is finished.
+                        echo "<td class='l'>".$comment."</td>";
+                    } else {
+                        echo "<td class='l'></td>";
+                    }
+                } else {
+                    echo "<td class='l'>".$comment."</td>";
+                }
                 echo "</tr>";
             }
         }
-        echo "</table></div></div>";
+        echo "</table>";
+
+        if ($eventId == 17) {
+            // Fewest moves; show scramble that was solved so solutions will make sense
+            $explodeScrambles = explode("<br />",get_scramble_text($eventId, $weekNo, $yearNo));
+            for ($solveId = 1; $solveId <= $solveCount; ++$solveId) {
+                $scrambleText = "Scramble: ".$explodeScrambles[$solveId - 1];
+                print <<<END
+                <div class='xLargeText'><br><br>$scrambleText<br></div>
+                <table class='table-striped table-dynamic'>
+                    <thead>
+                        <tr>
+                            <th class='l'>#</th>
+                            <th class='l'>Name</th>
+                            <th class='r'>Result</th>
+                            <th class='c'>Solution</th>
+                            <th class='comment'>Explanation</th>
+                        </tr>
+                    </thead>
+END;
+                if ($weeklyResults->get_participant_count($eventId) > 0) {
+                    $fmcResults = $mysqli->query("SELECT userId, moves, solution, comment FROM weeklyFmcSolves WHERE yearId = '$yearNo' AND weekId = '$weekNo' AND eventId = '$eventId' AND solveId = '$solveId' order by moves");
+                    $rank = 0;
+                    $count = 0;
+                    $prev = 0;
+                    while ($row = $fmcResults->fetch_assoc()) {
+                        $userId = $row['userId'];
+                        $moves = $row['moves'];
+                        ++$count;
+                        if ($moves > $prev) {
+                            $rank = $count;
+                            $prev = $moves;
+                        }
+                        if ($moves == 8888) {
+                            $moves = "DNF";
+                        } else if ($moves == 9999) {
+                            $moves = "DNS";
+                        }
+                        $personInfo = get_person_info($userId);
+                        echo "<tr>";
+                        echo "<td class='l'>".$rank."</td>";
+                        echo "<td class='userLink'><a href='showPersonalRecords.php?showRecords=$userId'><b>".$personInfo['displayName']." (".$personInfo['username'].")</b></a></td>";
+                        echo "<td class='r'><b>".$moves."</b></td>";
+                        // Need to handle multiple solves here
+                        $solutionExplanation = $row['comment'];
+                        echo "<td class='c'>".$row['solution']."</td>";
+                        echo "<td class='l'>".$solutionExplanation."</td>";
+                        echo "</tr>";
+                    }
+                }
+                echo "</table>";
+            }
+        }
+        echo "</div></div>";
     }
     print "</div>";
+    echo "<script>function copyToClipboard(element) {window.prompt('Copy to clipboard: Ctrl+C, Enter', element.id);}</script>";
     $selectEvent = filter_input(INPUT_GET, 'selectEvent', FILTER_VALIDATE_INT);
+    $selectIndex = filter_input(INPUT_GET, 'selectIndex', FILTER_VALIDATE_INT);
     if ($selectEvent) {
-        echo "<script>document.getElementById('showEvent').selectedIndex = $selectEvent; hideShow(document.getElementById('showEvent'));</script>";
-    } else {
-        echo "<script>document.getElementById('showEvent').selectedIndex = 1; hideShow(document.getElementById('showEvent'));</script>";
+        $selectIndex = $eventIndices[$selectEvent];
+    } elseif (!$selectIndex) {
+        $selectIndex = 1;
     }
+    echo "<script>document.getElementById('showEvent').selectedIndex = $selectIndex; hideShow(document.getElementById('showEvent'));</script>";
 

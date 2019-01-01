@@ -36,7 +36,10 @@
    </title>
 <?php
 	// Find Scrambles in database
-   for ($ei = 1; $ei < 29; $ei++) {
+   for ($ei = 1; $ei < 35; $ei++) {
+      if ($ei > 28 && $ei < 33) {
+          continue;
+      }
       $query  = "SELECT scramble FROM scrambles WHERE eventid ='$ei' ";
       $query .= " and weekId='$weekNo' AND yearId='$yearNo' ";
       $scramble = $mysqli->query($query)->fetch_row();

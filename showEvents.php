@@ -20,7 +20,6 @@
 <?php
     require_once 'statsHeader.php';
     require_once 'statFunctions.php';
-    require_once 'readEvents.php';
     if (is_admin()) {
         require_once 'modalDialogs.php';
     }
@@ -29,7 +28,7 @@
     if (!$eventSelected) {
         $eventSelected = 1;
     }
-    $eventNameSelected = $eventNames[$eventSelected];
+    $eventNameSelected = $events->name($eventSelected);
     $options = array("options" => array("regexp" => "/[a-zA-Z\ 0-9]*/"));
     $yearsSelected = filter_input(INPUT_GET, 'years', FILTER_VALIDATE_REGEXP, $options);
     $showSelected = filter_input(INPUT_GET, 'show', FILTER_VALIDATE_REGEXP, $options);
@@ -57,7 +56,7 @@ EOD;
             <label for='eventId'>Event:<br>
                 <select class='drop' id='eventId' name='eventId'>
 EOD;
-    foreach ($eventNames as $eventId => $eventName) {
+    foreach ($events as $eventId => $eventName) {
         if ($eventId == $eventSelected) {
             echo "<option value='$eventId' selected='selected'>$eventName</option>";
         } else {
@@ -206,10 +205,10 @@ EOD;
             $output = get_single_output($eventSelected, $row['min']);
         }
         if ($eventSelected == 13) {
-            $output .= " (".get_solve_details($eventSelected, 0, 0, 0, $row['min'], 0, false).")";
+            $output .= " (".get_solve_details($eventSelected, 0, 0, 0, $row['min'], false).")";
         }
         if (!$showSingles) {
-            $output = pretty_number(get_average($solveCounts[$eventSelected], $solves));
+            $output = pretty_number(get_average(get_solve_count($eventSelected, $year), $solves));
         }
         if ($output == 'DNF') {
             continue;
@@ -247,9 +246,9 @@ EOD;
             print "<td class='R2'>$output</td>";
         }
         $competitionName = get_competition_name($week, $year);
-        print "<td class='c'><a href='showWeeks.php?week=$week&year=$year&selectEvent=".($eventSelected + 2)."'>".$competitionName."</a></td>";
+        print "<td class='c'><a href='showWeeks.php?week=$week&year=$year&selectEvent=".($eventSelected)."'>".$competitionName."</a></td>";
         if (!$showSingles) {
-            print "<td class='f'>".get_solve_details($eventSelected, $solveCounts[$eventSelected], $solves, $row['result'], $row['multiBLD'], $row['fmcSolution'], false)."</td>";
+            print "<td class='f'>".get_solve_details($eventSelected, get_solve_count($eventSelected, $year), $solves, $row['result'], $row['multiBLD'], false)."</td>";
         } else {
             print "<td class='f'>&nbsp;</td>";
         }

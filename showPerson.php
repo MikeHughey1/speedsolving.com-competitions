@@ -21,7 +21,6 @@
 
     require_once 'statsHeader.php';
     require_once 'statFunctions.php';
-    require_once 'readEvents.php';
 
     $personId = filter_input(INPUT_GET, 'showPerson', FILTER_VALIDATE_INT);
     $personData = get_person_info($personId);
@@ -53,23 +52,27 @@ END;
         $yearNo = gmdate("o",strtotime('-1 day'));
     }
     $query = $mysqli->query("SELECT * FROM weeklyResults WHERE userId='$personId' AND weekId='$weekNo' AND yearId='$yearNo' ORDER BY eventId ASC");
-    while($resultRow = $query->fetch_array()) {
+    while ($resultRow = $query->fetch_array()) {
         // all regular events...
         $rankResult = $resultRow['result'];
         $eventId = $resultRow['eventId'];
-        $eventInfo = get_event_info($eventId);
-        $eventName = $eventInfo['eventName'];
-        $noTimes = $eventInfo['solveCount'];
+        $eventName = $events->name($eventId);
+        $solveCount = get_solve_count($eventId, $yearNo);
         $best = PHP_INT_MAX;
-        if($eventId!=13&&$eventId!=17){ 
+        if ($eventId != 13) { 
             $rezult = number_format(floatval($resultRow['result']),2,'.','');
             $result = pretty_number($rezult);
             $avg = 0;
             $dnf = 0;
-            for($i=1; $i <= $noTimes; $i++){
-                $solveDetails .= pretty_number(number_format(floatval($resultRow['solve'.$i]),2,'.','')) . ", ";
+            for($i=1; $i <= $solveCount; $i++){
+                if ($eventId == 17) {
+                    $solveValue = round($resultRow['solve'.$i]);
+                } else {
+                    $solveValue = pretty_number(number_format(floatval($resultRow['solve'.$i]),2,'.',''));
+                }
+                $solveDetails .= $solveValue.", ";
                 if ($resultRow['solve'.$i] > 0 && $resultRow['solve'.$i] < $best) {
-                    $best = $resultRow['solve'.$i];
+                    $best = $solveValue;
                 }
                 if ($resultRow['solve'.$i] == 8888 || $resultRow['solve'.$i] == 9999 || $resultRow['solve'.$i] == 'DNF' || $resultRow['solve'.$i] == 'DNS') {
                     ++$dnf;
@@ -78,9 +81,7 @@ END;
                 }
             }
             $solveDetails = substr($solveDetails,0,strlen($solveDetails)-2);
-        }
-        //MBLD IS RETARDED! D:
-        elseif($eventId==13) { 
+        } else { 
             $rezult = number_to_MBLD($resultRow['multiBLD']);
             $rankResult = $resultRow['multiBLD'];
             $result = $rezult['0'] . " points";
@@ -88,33 +89,24 @@ END;
             $solveDetails = $rezult['2'] . "/" . $rezult['3'] . " in " . $timeMBLD;
             $solveDetails = substr($solveDetails,0,strlen($solveDetails)-3);
         }
-        // FMC! :)
-        elseif($eventId==17){
-            $result = round($resultRow['result']);
-            if ($result == 8888){$result = "DNF";}
-            $solveDetails = stripslashes($resultRow['fmcSolution']);
-        }
         if ($best == PHP_INT_MAX) {
             $best = 8888;
         }
-        $best = pretty_number($best);
         
         // Fix results based on number of solves
-        if ($solveCounts[$eventId] == 1) {
-            $best = $result;
+        if ($solveCount === 1) {
             $result = "";
-        } elseif ($solveCounts[$eventId] == 3) {
+        } elseif ($solveCount === 3) {
             if ($dnf > 0) {
                 $result = 'DNF';
             } else {
-                $result = pretty_number($avg / $solveCounts[$eventId]);
+                $result = pretty_number($avg / $solveCount);
             }
         }
 
         // Calculatue ranking
-        if($noTimes>1){$place = 1;}
-        else{$place = 1;}
-        if($eventId!=13){
+        $place = 1;
+        if ($eventId != 13) {
             $queryRanking = $mysqli->query("SELECT userId FROM weeklyResults WHERE eventId='$eventId' AND weekId='$weekNo' AND yearId='$yearNo' AND result<'$rankResult' AND userID>='0' AND userId!='$personId'");
         } else {
             $queryRanking = $mysqli->query("SELECT userId FROM weeklyResults WHERE eventId='$eventId' AND weekId='$weekNo' AND yearId='$yearNo' AND multiBLD<'$rankResult' AND userID>='0' AND userId!='$personId'");

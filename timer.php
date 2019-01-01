@@ -1,3 +1,21 @@
+<style>
+.fmcTimerPanel {
+    display: inline-block;
+    height: 650px;
+    width: 100%;
+    margin-left: 10px;
+    margin-right: 10px;
+    text-align: center;
+}
+.submit-weekly-comment-timer {
+    display: block;
+    margin-left: 10px;
+    margin-right: 10px;
+    height: 100px;
+    width: 95%;
+    min-width: 300px;
+}
+</style>
 <?php
     $userId = $_SESSION['logged_in'];
     if (!$userId || $weekNo != gmdate("W",strtotime('-1 day'))) {
@@ -8,23 +26,22 @@
     $events = new Events;
     $eventId = filter_input(INPUT_GET, 'event', FILTER_VALIDATE_INT);
     $eventName = $events->name($eventId);
-    $noSolves = $events->num_solves($eventId);
-    $result = $mysqli->query("SELECT comment, solve1, solve2, solve3, solve4, solve5, multiBLD, fmcSolution FROM weeklyResults WHERE eventId='$eventId' AND userId='$userId' AND weekId='$weekNo' AND yearId='$yearNo'")->fetch_array();
+    $solveCount = get_solve_count($eventId, $yearNo);
+    $result = $mysqli->query("SELECT comment, solve1, solve2, solve3, solve4, solve5, multiBLD FROM weeklyResults WHERE eventId='$eventId' AND userId='$userId' AND weekId='$weekNo' AND yearId='$yearNo'")->fetch_array();
     $scramble = $mysqli->query("SELECT scramble FROM scrambles WHERE eventId='$eventId' AND weekId='$weekNo' AND yearId='$yearNo'")->fetch_array();
     $explodeScrambles = explode("<br />",$scramble[0]);
     $scrambles = json_encode($explodeScrambles);
     add_icon($eventName, "cubing-icon-3x");
-    echo "<font class='submit-weekly-header' id='eventName'> $eventName </font>";
+    echo "<span class='submit-weekly-header' id='eventName'> $eventName </span>";
     $personalBestString = "PB Single: ".get_personal_best_single($eventId, $userId, true);
     $personalBestStringShort = "PB Sgl: ".get_personal_best_single($eventId, $userId, false);
-    if ($events->num_solves($eventId) > 1 && $events->num_solves($eventId) < 30) {
+    if (get_solve_count($eventId, $yearNo) > 1) {
         $personalBestString .= ", Average: ".get_personal_best_average($eventId, $userId, true);
         $personalBestStringShort .= ", Avg: ".get_personal_best_average($eventId, $userId, false);
     }
     echo "<span class='centerText' id='pb-text'>&nbsp;&nbsp;$personalBestString</span>";
     echo "<div class='centerText' id='pb-text-short'>$personalBestStringShort</div>";
-    $fmcSolution = stripslashes($result['fmcSolution']);
-    $comment = str_ireplace("<br />","\n",stripslashes($result['comment']));
+    $comment = str_ireplace("<br />", "\n", $result['comment']);
     $results = array($result['solve1'],$result['solve2'],$result['solve3'],$result['solve4'],$result['solve5']);
     $multiBLD = $result['multiBLD'];
 
@@ -47,7 +64,7 @@
     echo "<div class='centerText' id='touchInstructions' hidden>Touch here to start timer</div>";
     echo "<img class='touchImage' id='touchImage' src='Hand.png' alt='Touch here' hidden>";
     // buttons to be shown when manually editing times
-    echo "<div class='btn-group' class='centerText' id='editButtons' hidden>";
+    echo "<div class='btn-group centerText' id='editButtons' hidden>";
     echo "<br />";
     echo "<button type='button' class='buttonLarge' id='dnf' onclick='dnfEdited()' value=0>DNF</button><span>   </span>";
     echo "<button type='button' class='buttonLarge' id='save' onclick='saveEdits()'>Save</button><span>   </span>";
@@ -55,18 +72,17 @@
     echo "</div>";
     // end of edit buttons
     echo "</div>";
-    if ($eventId == 17) {
+    if (is_fewest_moves($eventId)) {
         echo "<div class='fmcTimerPanel' id='resultsWindow'>";
     } else {
         echo "<div class='timerPanel' id='resultsWindow'>";
     }
-    echo "<button type='button' class='centerText' onclick='manualEntryStart()' id='manualSelect'>Click to enter times manually</button><br /><br />";
-    echo "<form action='index.php' method='post' onsubmit='return validate(event);'>";
-    if ($eventId == 17) {
-        echo "<div class='centerText' id='resultHeader'><strong>Solution</strong></div>";
-        echo "<input type='hidden' name='weekly".$eventId."Time1' id='resultSolve1' value='".$results[0]."' />";
-        echo "<textarea class='submit-weekly-comment-timer' name='weekly".$eventId."Time1' id='solution'>".$fmcSolution."</textarea><br />";
-    } else if ($eventId == 13) {
+    echo "<button type='button' class='centerText' onclick='manualEntryStart()' id='manualSelect'>Click to enter times manually</button>";
+    if (!is_fewest_moves($eventId)) {
+        echo "<br><br>";
+    }
+    echo "<form action='index.php' method='post' id='resultForm' onsubmit='return validate(event);'>";
+    if ($eventId == 13) {
         echo "<input type='hidden' name='weekly".$eventId."Time1' id='resultSolve1' value='".$timeMBLD."' />";
         echo "<div class='xLargeText' id='MBLDInputs' hidden>";
         echo "<div>Number attempted: <input class='mbldInput' type='text' name='weekly".$eventId."Time2' id='attemptedNo' value='".$attemptedNo."' /></div><br />";
@@ -81,22 +97,43 @@
     } else {
         echo "<div>";
         echo "<div class='centerText' id='resultHeader'><strong>Results</strong></div>";
-        for ($i = 1; $i <= $noSolves; $i++) {
+        for ($i = 1; $i <= $solveCount; $i++) {
             echo "<div>";
             echo "<input type='hidden' name='weekly".$eventId."Time".$i."' id='resultSolve".$i."' value='".$results[$i - 1]."' />";
             echo "<div class='btn-group centerText' id='solveGroup".$i."'>";
             echo "$i. <span class='timerTooltip'><span id='solve".$i."'></span><span class='timerTooltiptext'>".$explodeScrambles[$i - 1]."</span></span>";
-            echo "<button type='button' class='btn-group-xs' id='plusTwo".$i."' value=0 onclick='plusTwoThis(".$i.")'>+2 (+0)</button><span>  </span>";
-            echo "<button type='button' class='btn-group-xs' id='dnf".$i."' onclick='dnfThis(".$i.")' value=8888>DNF</button><span>  </span>";
-            echo "<button type='button' class='btn-group-xs' id='edit".$i."' onclick='editThis(".$i.")'>Edit</button><span>  </span>";
-            echo "<button type='button' class='btn-group-xs' id='delete".$i."' onclick='deleteThis(".$i.")'>Delete</button>";
+            echo "<button type='button' class='btn-group-xs' id='plusTwo".$i."' value=0 onclick='plusTwoThis(".$i.")' hidden>+2 (+0)</button><span>  </span>";
+            echo "<button type='button' class='btn-group-xs' id='dnf".$i."' onclick='dnfThis(".$i.")' value=8888 hidden>DNF</button><span>  </span>";
+            echo "<button type='button' class='btn-group-xs' id='edit".$i."' onclick='editThis(".$i.")' hidden>Edit</button><span>  </span>";
+            echo "<button type='button' class='btn-group-xs' id='delete".$i."' onclick='deleteThis(".$i.")' hidden>Delete</button>";
             echo "</div>";
             echo "</div><br />";
         }
         echo "</div>";
     }
-    echo "<div class='centerText' id='avgResult'></div><br />";
-    echo "<div class='centerText'>Comment:</div>";
+    echo "<div class='centerText' id='avgResult'></div>";
+    if (is_fewest_moves($eventId)) {
+        for ($solveId = 1; $solveId <= $solveCount; ++$solveId) {
+            $solveResult = "";
+            $solutionExplanation = "";
+            $fmcResults = $mysqli->query("SELECT solution, comment FROM weeklyFmcSolves WHERE yearId = '$yearNo' AND weekId = '$weekNo' AND userId = '$userId' AND eventId = '$eventId' AND solveId = '$solveId'")->fetch_array();
+            if ($fmcResults['solution'] != "") {
+                $solveResult = htmlspecialchars($fmcResults['solution'], ENT_QUOTES);
+                $solutionExplanation = htmlspecialchars(str_ireplace("<br />", "\n", $fmcResults['comment']), ENT_QUOTES);
+            }
+            echo "<input type='hidden' id='weeklySolution".$solveId."' name='weeklySolution".$solveId."' value='".$solveResult."'>";
+            echo "<input type='hidden' id='weeklySolutionExplanation".$solveId."' name='weeklySolutionExplanation".$solveId."' value='".$solutionExplanation."'>";
+        }
+        echo "<div id='workingSolutionInfo' style='display:none'>";
+        echo "<div class='centerText' id='resultHeader'><strong>Solution</strong></div>";
+        echo "<textarea class='submit-weekly-comment-timer' name='workingSolution' id='workingSolution'></textarea>";
+        echo "<div class='centerText' id='resultHeader'><strong>Explanation</strong></div>";
+        echo "<textarea class='submit-weekly-comment-timer' name='workingSolutionExplanation' id='workingSolutionExplanation'></textarea>";
+        echo "</div>";
+        echo "<div class='centerText'><strong>Overall Comment:</strong></div>";
+    } else {
+        echo "<br><div class='centerText'><strong>Comment:</strong></div>";
+    }
     echo "<textarea class='submit-weekly-comment-timer' name='weeklyComment".$eventId."' id='editComment'>".$comment."</textarea>";
     echo "<br /><div  class='centerText'><input type='submit' value='Submit Times' id='submitButton' /></div>";
     echo "<input type='hidden' value='weeklySubmit' name='update' />";
@@ -112,7 +149,7 @@
     echo "<audio id='go' muted preload='auto'></audio>";
     echo "<audio id='penalty' muted preload='auto'></audio>";
     echo "<audio id='stop' muted preload='auto'></audio>";
-    //echo "</div>";
+    echo "</div>";
 ?>
 <script>
     // Status : 0=not running, 1=activated, 2=running, 3=deactivated, 4=delayed(to prevent accidental restart), 5=edit mode, 6=done
@@ -136,26 +173,26 @@
     var blindfoldedMode = localStorage.getItem('blindfoldedMode') === 'true' ? true : false;
     
     function init(){
-        noSolves = <?php print $noSolves ?>;
+        solveCount = <?php print $solveCount ?>;
         scrambles = <?php print $scrambles ?>;
         eventId = <?php print $eventId ?>;
-        fmcSolution = "<?php print $fmcSolution ?>";
         splitCount = (blindfoldedMode && is_blindfolded_event()) ? 1 : 0;
         splitsRemaining = splitCount;
         splitValues = new Array(splitCount);
         splitValues[0] = 0;
+        startingEdit = false;
         changeStatus(status_notRunning);
         if (eventId !== 13) {
             removeDNS();
         }
         editedItem = 0;
         countdown = 0;
-        for (i = 1; i <= noSolves; i++) {
+        for (i = 1; i <= solveCount; i++) {
             // Replace nonbreaking spaces with regular spaces, especially for Clock scrambles.
             scrambles[i - 1] = scrambles[i - 1].replace(/\&nbsp\;/g,' ');
-
+ 
             // Populate DNF info
-            if (!is_countdown_event()) {
+            if (eventId !== 13) {
                 if (document.getElementById("resultSolve" + i).value == "8888") {
                     var dnfButton = document.getElementById('dnf' + i);
                     dnfButton.value = 0;
@@ -164,7 +201,7 @@
             }
         }
         updateSolveText(0, true);
-        if (eventId === 17) {
+        if (is_fewest_moves_event()) {
             applyFMCCorrections();
         } else if (eventId === 13) {
             applyMultiCorrections();
@@ -214,7 +251,7 @@
         }
         if (localStorage.getItem('defaultTimerToManualEntry') === 'true') {
             manualEntryStart();
-            if (editedItem > noSolves) {
+            if (editedItem > solveCount) {
                 hideEditFunctions();
             }
         }
@@ -254,31 +291,49 @@
 
         // For FMC, preprocess solution to make sure it is valid.
         solution = "";
-        if (eventId == 17) {
-            solution = document.getElementById("solution").value;
-            if (solution == "DNF") {
-                hasDNF = true;
-            } else if (solution != "" && solution != "DNS") {
-                hasValidSolve = true;
-            }
-            if (hasValidSolve) {
-                solution = solution.replace(/W/g, "w");
-                solution = solution.replace(/X/g, "x");
-                solution = solution.replace(/Y/g, "y");
-                solution = solution.replace(/Z/g, "z");
-                solution = solution.replace(/’/g, "'");
-                solution = solution.replace(/‘/g, "'");
-                validRegex = /^(([FBUDLRxyz][w]?[2']?\s*)|([\[][fbudlr][2']?[\]]\s*))*$/;
-                if (!validRegex.test(solution)) {
-                    alertString = "Your submitted solution does not meet WCA notation rules.  Please adjust your solution to meet WCA regulations.";
-                    alert(alertString);
-                    return false;
+        if (is_fewest_moves_event()) {
+            if (getNextSolveId() <= solveCount || editedItem != 0) {
+                solution = document.getElementById("workingSolution").value;
+                if (solution == "DNF") {
+                    hasDNF = true;
+                } else if (solution != "" && solution != "DNS") {
+                    hasValidSolve = true;
+                }
+                if (hasValidSolve) {
+                    solution = solution.replace(/W/g, "w");
+                    solution = solution.replace(/X/g, "x");
+                    solution = solution.replace(/Y/g, "y");
+                    solution = solution.replace(/Z/g, "z");
+                    solution = solution.replace(/’/g, "'");
+                    solution = solution.replace(/‘/g, "'");
+                    validRegex = /^(([FBUDLRxyz][w]?[2']?\s*)|([\[][fbudlr][2']?[\]]\s*))*$/;
+                    if (!validRegex.test(solution)) {
+                        alertString = "Your submitted solution does not meet WCA notation rules.  Please adjust your solution to meet WCA regulations.";
+                        alert(alertString);
+                        return false;
+                    } else {
+                        document.getElementById("workingSolution").value = solution;
+                    }
+                    if (document.getElementById("workingSolutionExplanation").value === "") {
+                        if (typeof variable !== 'undefined') {
+                            event.preventDefault();
+                        }
+                        alertString = "Please enter an explanation of your solution.\n\nAll fewest moves solutions require an explanation of how you obtained the solution.\n\n";
+                        alertString += "Please give a sufficient explanation such that a moderator can figure out how you found the solution.  If the explanation is not sufficent to explain ";
+                        alertString += "how the solution was obtained, a moderator may contact you for a better explanation, and if none is provided, we reserve the right to change ";
+                        alertString += "your solution to a DNF.";
+                        alert(alertString);
+                        return false;
+                    }
+                }
+                if (editedItem != 0) {
+                    preserve_fewest_moves_solution(editedItem);
                 } else {
-                    document.getElementById("solution").value = solution;
+                    preserve_fewest_moves_solution(getNextSolveId());
                 }
             }
         } else {
-            for (i = 1; i <= noSolves; i++) {
+            for (i = 1; i <= solveCount; i++) {
                 result = document.getElementById("resultSolve" + i).value;
                 if (is_DNF(result)) {
                     hasDNF = true;
@@ -306,18 +361,16 @@
             alert(alertString);
             return false;
         }
-        if (eventId == 17) {
-            if (hasValidSolve) {
-                event.preventDefault();
-                alertString = "Please enter a comment.\n\nAll fewest moves solutions require a comment that explains how you obtained the solution.\n\n";
-                alertString += "Please give a sufficient explanation such that a moderator can figure out how you found the solution.  If the comment is not sufficent to explain ";
-                alertString += "how the solution was obtained, a moderator may contact you for a better explanation, and if none is provided, we reserve the right to change ";
-                alertString += "your solution to a DNF.";
-                alert(alertString);
-                return false;
-            }
-        }
         return true;
+    }
+    
+    function is_fewest_moves_event()
+    {
+        if (eventId === 17 || eventId === 32)
+        {
+            return true;
+        }
+        return false;
     }
 
     function is_blindfolded_event()
@@ -329,14 +382,14 @@
     }
     
     function is_countdown_event() {
-        if (eventId === 17 || eventId === 13) {
+        if (is_fewest_moves_event() || eventId === 13) {
             return true;
         }
         return false;
     }
     
     function is_no_inspection_event() {
-        if ((eventId >= 7 && eventId <= 13) || eventId === 17) {
+        if ((eventId >= 7 && eventId <= 13) || is_fewest_moves_event()) {
             return true;
         }
         return false;
@@ -357,12 +410,17 @@
     }
     
     function applyFMCCorrections() {
-        document.getElementById('editComment').style.height = "300px";
         document.getElementById('resultHeader').innerHTML = "<strong>Solution</strong>";
         document.getElementById('submitButton').value = "Submit Solution";
         document.getElementById('manualSelect').hidden = true;
-        setCountdown();
-        document.getElementById("timeDisplay").innerHTML = getDisplayTime(countdown);
+        prepare_fmc_countdown();
+    }
+    
+    function prepare_fmc_countdown() {
+        if (getNextSolveId() <= solveCount) {
+            setCountdown();
+            document.getElementById("timeDisplay").innerHTML = getDisplayTime(countdown);
+        }
     }
     
    function applyMultiCorrections() {
@@ -379,7 +437,7 @@
     }
     
     function removeDNS() {
-        for (i = 1; i <= noSolves; i++){
+        for (i = 1; i <= solveCount; i++){
             if (document.getElementById("resultSolve" + i).value == "9999") {
                 document.getElementById("resultSolve" + i).value = 0;
             }
@@ -399,7 +457,7 @@
             }
         } else {
             // Currently editing; stop editing now
-            if (editedItem != 0) {
+            if (editedItem !== 0) {
                 document.getElementById('solveGroup' + editedItem).style.backgroundColor = '#FFFFFF';
             }
             editedItem = 0;
@@ -425,7 +483,7 @@
     }
 	
     function getNextSolveId() {
-        for (i = 1; i <= noSolves; i++) {
+        for (i = 1; i <= solveCount; i++) {
             if (document.getElementById("resultSolve" + i).value == 0) {
                 return i;
             }
@@ -475,15 +533,15 @@
     function showNextScramble() {
         if (eventId === 13) {
             document.getElementById("currentScramble").innerHTML = "";
-            noSolves = document.getElementById("attemptedNo").value;
-            if (noSolves < 1) {
-                noSolves = 0;
+            solveCount = document.getElementById("attemptedNo").value;
+            if (solveCount < 1) {
+                solveCount = 0;
                 document.getElementById("currentScramble").innerHTML = "Please type in number of cubes to attempt and hit Enter:";
-            } else if (noSolves == 1) {
-                noSolves = 0;
+            } else if (solveCount === 1) {
+                solveCount = 0;
                 document.getElementById("currentScramble").innerHTML = "Must attempt at least 2 cubes for multiBLD!";
-            } else if (noSolves > scrambles.length - 1) {
-                noSolves = 0;
+            } else if (solveCount > scrambles.length - 1) {
+                solveCount = 0;
                 document.getElementById("currentScramble").innerHTML = "Not enough scrambles!  Please select a number of cubes less than or equal to " + (scrambles.length - 1) + ".";
             }
             document.getElementById("timeInput").focus();
@@ -493,14 +551,14 @@
             document.getElementById("currentScramble").innerHTML = scrambles[editedItem - 1];
             return;
         }
-        for (i = 1; i <= noSolves; i++) {
+        for (i = 1; i <= solveCount; i++) {
             if (eventId === 13) {
                 document.getElementById("currentScramble").innerHTML += scrambles[i - 1]+"<br />";
-            } else if (eventId === 17) {
-                if (currentStatus !== status_notRunning && currentStatus !== status_activated) {
+            } else if (is_fewest_moves_event()) {
+                if (document.getElementById("weeklySolution"+i).value == "" && currentStatus !== status_notRunning && currentStatus !== status_activated) {
                     document.getElementById("currentScramble").innerHTML = scrambles[i - 1];
+                    break;
                 }
-                break;
             } else if (document.getElementById("resultSolve"+i).value == 0) {
                 document.getElementById("currentScramble").innerHTML = scrambles[i - 1];
                 break;
@@ -509,7 +567,7 @@
     }
     
     function calculateAverage() {
-        if (noSolves === 1) return;
+        if (solveCount === 1) return;
         var dnfCount = 0;
         var avgText = "Average of 5";
         solve1 = parseFloat(document.getElementById("resultSolve1").value);
@@ -518,7 +576,7 @@
         if (solve1 == 8888 || solve1 == 9999) dnfCount++;
         if (solve2 == 8888 || solve2 == 9999) dnfCount++;
         if (solve3 == 8888 || solve3 == 9999) dnfCount++;
-        if (noSolves === 3) {
+        if (solveCount === 3) {
             avg = Math.round(100*(solve1+solve2+solve3)/3)/100;
             avgText = "Mean of 3";
         } else {
@@ -530,7 +588,7 @@
             high = Math.max(solve1, solve2, solve3, solve4, solve5);
             avg = Math.round(100*(solve1+solve2+solve3+solve4+solve5-low-high)/3)/100;
         }
-        if (dnfCount > 1 || (noSolves === 3 && dnfCount > 0)) {
+        if (dnfCount > 1 || (solveCount === 3 && dnfCount > 0)) {
             document.getElementById('avgResult').innerHTML = "DNF " + avgText;
         } else if (!isNaN(avg)) {
             document.getElementById('avgResult').innerHTML = getDisplayTime(avg) + " " + avgText;
@@ -562,6 +620,12 @@
                     document.getElementById("timeInput").value = 0;
                     document.getElementById("timeInput").hidden = false;
                     document.getElementById("timeInput").focus();
+                    if (is_fewest_moves_event()) {
+                        document.getElementById('dnf').hidden = true;
+                        if (document.getElementById("resultSolve" + editedItem).value == 0) {
+                            document.getElementById('cancel').hidden = true;
+                        }
+                    }
                     document.getElementById("editButtons").hidden = false;
                 }
                 disableTouch();
@@ -585,14 +649,17 @@
                 
             case status_notRunning:
                 document.getElementById("resultsWindow").style.pointerEvents = "initial";
-                if (eventId === 17) {
+                if (is_fewest_moves_event()) {
                     document.getElementById("currentScramble").innerHTML = "Start timer to see scramble";
+                    clear_working_solution();
                 }
                 document.getElementById("timeDisplay").style.color = "black";
                 editedItem = 0;
                 hideEditFunctions();
-                document.getElementById('manualSelect').innerHTML = "Click to enter times manually";
-                document.getElementById('manualSelect').hidden = false;
+                if (!is_fewest_moves_event()) {
+                    document.getElementById('manualSelect').innerHTML = "Click to enter times manually";
+                    document.getElementById('manualSelect').hidden = false;
+                }
                 enableTouch("Touch here to start timer");
                 splitsRemaining = splitCount; // reset split counter for next solve
                 break;
@@ -601,8 +668,9 @@
                 scroll(0,0);
                 enableTouch("Touch here to stop timer");
                 document.getElementById("timeDisplay").style.color = "black";
-                if (eventId === 17) {
+                if (is_fewest_moves_event()) {
                     showNextScramble();
+                    document.getElementById("workingSolutionInfo").style.display = 'block';
                 } else {
                     document.getElementById("resultsWindow").style.pointerEvents = "none";
                     document.getElementById("currentScramble").innerHTML = "Solving scramble " + getNextSolveId();
@@ -682,7 +750,7 @@
             changeStatus(status_deactivated);
         }
         
-        if (is_countdown_event()) {
+        if (eventId == 13) {
             if (resultTime != 0) {
                 document.getElementById("resultSolve1").value = resultTime;
                 changeStatus(status_done);
@@ -695,20 +763,33 @@
 
         var solveUpdated = 0;
         allSolved = true;
-        for (i = 1; i <= noSolves; i++) {
+        for (i = 1; i <= solveCount; i++) {
             if (document.getElementById("resultSolve" + i).value == 0) {
                 if (resultTime == 0) {
-                    document.getElementById("solve" + i).innerHTML = "";
-                    hideCorrectionButtons(i);
+                    if (eventId !== 13) {
+                        document.getElementById("solve" + i).innerHTML = "";
+                        hideCorrectionButtons(i);
+                    }
                     allSolved = false;
                 } else {
-                    document.getElementById("resultSolve"+i).value = resultTime;
-                    document.getElementById("solve" + i).innerHTML = getDisplayTime(resultTime) + "  ";
-                    showCorrectionButtons(i);
+                    if (is_fewest_moves_event()) {
+                        document.getElementById("resultSolve"+i).value = 0;
+                    } else {
+                        document.getElementById("resultSolve"+i).value = resultTime;
+                    }
+                    if (eventId !== 13) {
+                        if (!is_fewest_moves_event()) {
+                            document.getElementById("solve" + i).innerHTML = getDisplayTime(resultTime) + "  ";
+                        }
+                        showCorrectionButtons(i);
+                    }
                     solveUpdated = i;
                     resultTime = 0;
                 }
-            } else {
+            } else if (is_fewest_moves_event()) {
+                document.getElementById("solve" + i).innerHTML = document.getElementById("resultSolve" + i).value + "  ";
+                showCorrectionButtons(i);
+            } else if (eventId !== 13) {
                 document.getElementById("solve" + i).innerHTML = getDisplayTime(document.getElementById("resultSolve" + i).value) + "  ";
                 showCorrectionButtons(i);
             }
@@ -732,7 +813,7 @@
     }
 
     function resumeTimer() {
-        if (!is_countdown_event() && !allSolved) {
+        if (eventId !== 13 && !allSolved) {
             changeStatus(status_notRunning);
         }
     }
@@ -740,10 +821,10 @@
     function setCountdown() {
         countdown = 3600;
         if (eventId === 13) {
-            noSolves = document.getElementById("attemptedNo").value;
-            if (noSolves < 6) {
+            solveCount = document.getElementById("attemptedNo").value;
+            if (solveCount < 6) {
                 // Time allowed for multiBLD
-                countdown = noSolves * 600;
+                countdown = solveCount * 600;
             }
         }
     }
@@ -806,7 +887,11 @@
 
     function refresh() {
         if (currentStatus === status_edit) {
-            document.getElementById("timeDisplay").innerHTML = getDisplayTime(document.getElementById("resultSolve" + editedItem).value);
+            if (is_fewest_moves_event()) {
+                document.getElementById("timeDisplay").innerHTML = document.getElementById("resultSolve" + editedItem).value;
+            } else {
+                document.getElementById("timeDisplay").innerHTML = getDisplayTime(document.getElementById("resultSolve" + editedItem).value);
+            }
         }
         if (   currentStatus !== status_running
             && currentStatus !== status_inspecting
@@ -818,7 +903,8 @@
         curTime = get_result_time();
         if (currentStatus === status_running && countdown > 0 && countdown - curTime < 0) {
             play_sound("stop");
-            if (eventId === 17) {
+            if (is_fewest_moves_event()) {
+                preserve_fewest_moves_solution(getNextSolveId());
                 document.getElementById("currentScramble").innerHTML = "Time is up; make necessary edits at right and press 'submitSolution' button.";
             } else if (eventId === 13) {
                 document.getElementById("currentScramble").innerHTML = "Time is up; enter number of cubes solved and hit Enter:";
@@ -827,17 +913,19 @@
             updateSolveText(getDisplayTime(countdown), true);
             if (eventId === 13) {
                 prepare_enter_solved(curTime);
+            } else if (is_fewest_moves_event()) {
+                editThis(getNextSolveId());
             } else {
                 changeStatus(status_done);
             }
             return;
-        } else if (currentStatus === status_running && eventId === 17 && nextPlay === 0 && countdown - curTime < 300) {
+        } else if (currentStatus === status_running && is_fewest_moves_event() && nextPlay === 0 && countdown - curTime < 300) {
             nextPlay = 1;
             play_sound("fiveMinutes");
         }
         
         countdownCurrent = countdown - curTime;
-        if (eventId === 17) {
+        if (is_fewest_moves_event()) {
             document.getElementById("timeDisplay").innerHTML = getDisplayTime(countdownCurrent);
         } else if (eventId !== 13 && (currentStatus === status_inspecting || currentStatus === status_preparingActivation || currentStatus === status_activated)) {
             if (countdownCurrent < 7 && nextPlay === 1) {
@@ -884,7 +972,9 @@
         if (document.activeElement.id === "attemptedNo") return;
         if (document.activeElement.id === "solvedNo") return;
         if (document.activeElement.id === "multiTime") return;
-        if (document.activeElement.id === "weekly17Time3") return;
+        if (document.activeElement.id === "weekly13Time3") return;
+        if (document.activeElement.id.substr(0, 15) === "workingSolution") return;
+        if (currentStatus === status_edit && is_fewest_moves_event()) return;
         if (currentStatus === status_running) {
             if (is_blindfolded_event() && splitsRemaining > 0) {
                 splitValues[splitCount - splitsRemaining] = get_result_time();
@@ -892,18 +982,23 @@
                 changeStatus(status_indicatingSplit);
             } else if (is_countdown_event()) {
                 finished = true;
-                if (eventId === 17) {
+                if (is_fewest_moves_event()) {
                     if (confirm('Time is not up yet; please select "Cancel" if you really want to stop now.')) {
                         finished = false;
+                    } else {
+                        preserve_fewest_moves_solution(getNextSolveId());
                     }
                 }
                 if (finished) {
                     clearTimeout(timer);
                     resultTime = get_result_time();
-                    document.getElementById("timeDisplay").innerHTML = getDisplayTime(resultTime);
+                    if (!is_fewest_moves_event()) {
+                        document.getElementById("timeDisplay").innerHTML = getDisplayTime(resultTime);
+                    }
                     updateSolveText(resultTime, true);
-                    if (eventId === 17) {
-                        document.getElementById("currentScramble").innerHTML = "Finished; enter solution and explanation at right and then click 'Submit Solution'.";
+                    if (is_fewest_moves_event()) {
+                        document.getElementById("currentScramble").innerHTML = "Finished; enter solution and explanation at right and click 'Save'.";
+                        editThis(getNextSolveId());
                     } else if (eventId === 13) {
                         document.getElementById("currentScramble").innerHTML = "Finished; enter number of cubes solved and hit Enter:";
                         prepare_enter_solved(resultTime);
@@ -1043,6 +1138,9 @@
     }
 
     function getEditTime(value) {
+        if (is_fewest_moves_event()) {
+            return value;
+        }
         return (Math.floor(value / 10000) * 6000 + value % 10000) / 100;
     }
 
@@ -1074,10 +1172,25 @@
         }
         return result;
     }
+    
+    function preserve_fewest_moves_solution(id)
+    {
+        document.getElementById("weeklySolution"+id).value = document.getElementById("workingSolution").value;
+        document.getElementById("weeklySolutionExplanation"+id).value = document.getElementById("workingSolutionExplanation").value;
+    }
+    
+    function clear_working_solution()
+    {
+        document.getElementById("workingSolution").value = "";
+        document.getElementById("workingSolutionExplanation").value = "";
+        document.getElementById("workingSolutionInfo").style.display = 'none';
+    }
 
     function showCorrectionButtons(id) {
-        document.getElementById('plusTwo' + id).hidden = false;
-        document.getElementById('dnf' + id).hidden = false;
+        if (!is_fewest_moves_event()) {
+            document.getElementById('plusTwo' + id).hidden = false;
+            document.getElementById('dnf' + id).hidden = false;
+        }
         document.getElementById('edit' + id).hidden = false;
         document.getElementById('delete' + id).hidden = false;
     }
@@ -1147,7 +1260,7 @@
         dnfButton.value = previousValue;
         dnfButton.style.backgroundColor = '#AF5050';
         document.getElementById('resultSolve' + id).value = "8888";
-        if (editedItem != 0) {
+        if (editedItem !== 0) {
             document.getElementById('dnf').value = getEditTime(document.getElementById("timeInput").value);
             document.getElementById('dnf').style.backgroundColor = '#AF5050';
         }
@@ -1158,7 +1271,7 @@
         document.getElementById('resultSolve' + id).value = (dnfButton.value == 8888) ? 0 : dnfButton.value;
         dnfButton.value = 8888;
         dnfButton.style.backgroundColor = '#4CAF50';
-        if (editedItem != 0) {
+        if (editedItem !== 0) {
             document.getElementById('dnf').value = 8888;
             document.getElementById('dnf').style.backgroundColor = '#4CAF50';
         }
@@ -1171,17 +1284,24 @@
             removeDnfStatus(id);
             document.getElementById('resultSolve' + id).value = "";
             document.getElementById('solve' + id).innerHTML = id + ".  ";
+            if (is_fewest_moves_event()) {
+                document.getElementById("weeklySolution"+id).value = "";
+                document.getElementById("weeklySolutionExplanation"+id).value = "";
+                prepare_fmc_countdown();
+            }
         }
         document.getElementById("timeDisplay").innerHTML = "0.00";
         changeStatus(status_notRunning);
         updateSolveText(0, true);
-        if (!is_countdown_event()) {
+        if (eventId !== 13) {
             if (localStorage.getItem('defaultTimerToManualEntry') === 'true') {
                 manualEntryStart();
             } else {
                 document.getElementById('manualSelect').innerHTML = "Click to enter times manually";
             }
-            document.getElementById('manualSelect').hidden = false;
+            if (!is_fewest_moves_event()) {
+                document.getElementById('manualSelect').hidden = false;
+            }
         }
         document.getElementById('dnf' + id).value = 8888;
         document.getElementById('dnf' + id).style.backgroundColor = '#4CAF50';
@@ -1195,8 +1315,16 @@
         editedItem = id;
         changeStatus(status_edit);
         newValue = document.getElementById("resultSolve" + editedItem).value;
-        document.getElementById("timeInput").value = createEditTime(newValue);
-        document.getElementById("timeDisplay").innerHTML = getDisplayTime(newValue);
+        if (is_fewest_moves_event()) {
+            document.getElementById("timeInput").value = newValue;
+            document.getElementById("timeDisplay").innerHTML = newValue;
+            document.getElementById("workingSolution").value = document.getElementById("weeklySolution"+id).value;
+            document.getElementById("workingSolutionExplanation").value = document.getElementById("weeklySolutionExplanation"+id).value;
+            document.getElementById("workingSolutionInfo").style.display = 'block';
+        } else {
+            document.getElementById("timeInput").value = createEditTime(newValue);
+            document.getElementById("timeDisplay").innerHTML = getDisplayTime(newValue);
+        }
         document.getElementById('dnf').value = document.getElementById('dnf' + editedItem).value;
         if (document.getElementById('dnf').value != 8888) {
             document.getElementById('dnf').style.backgroundColor = '#AF5050';
@@ -1225,7 +1353,11 @@
             removeDnfStatus(editedItem);
         }
         document.getElementById("timeInput").value = "";
-        document.getElementById("timeDisplay").innerHTML = getDisplayTime(getEditTime(newValue));
+        if (is_fewest_moves_event()) {
+            document.getElementById("timeDisplay").innerHTML = newValue;
+        } else {
+            document.getElementById("timeDisplay").innerHTML = getDisplayTime(getEditTime(newValue));
+        }
         document.getElementById('dnf').value = 0;
         document.getElementById('dnf').style.backgroundColor = '#4CAF50';
         document.getElementById('solveGroup' + editedItem).style.backgroundColor = '#FFFFFF';
@@ -1242,7 +1374,7 @@
             hideEditFunctions();
         } else if (document.getElementById("manualSelect").innerHTML != "Use timer") {
             changeStatus(status_notRunning);
-        } else if (editedItem > noSolves) {
+        } else if (editedItem > solveCount) {
             changeStatus(status_done);
         } else {
             editThis(editedItem);
@@ -1268,12 +1400,30 @@
     }
    
     function saveEdits() {
+        if (is_fewest_moves_event()) {
+            preserve_fewest_moves_solution(editedItem);
+            if (validate()) {
+                document.forms['resultForm'].submit();
+            } else {
+                return;
+            }
+        }
         finishEdit();
     }
     
     function cancelEdits() {
+        if (is_fewest_moves_event()) {
+            if (!validate()) {
+                return;
+            }
+        }
         document.getElementById("timeInput").value = 0;
-        document.getElementById("timeDisplay").innerHTML = getDisplayTime(document.getElementById("resultSolve" + editedItem).value);
+        if (is_fewest_moves_event()) {
+            document.getElementById("timeDisplay").innerHTML = document.getElementById("resultSolve" + editedItem).value;
+            clear_working_solution();
+        } else {
+            document.getElementById("timeDisplay").innerHTML = getDisplayTime(document.getElementById("resultSolve" + editedItem).value);
+        }
         document.getElementById('dnf').value = 0;
         document.getElementById('dnf').style.backgroundColor = '#4CAF50';
 

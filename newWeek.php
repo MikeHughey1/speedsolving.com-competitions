@@ -18,10 +18,11 @@
         print $eventName[0];
         $noTimes = $eventName[1];
 
-        if ($eventId != 13 && $eventId != 17) { // regular events
+        if ($eventId != 13) { // regular events
             $rezult = number_format(floatval($resultRow['result']), 2, '.', '');
             $result = prettyNumber($rezult);
             for ($i = 1; $i <= $noTimes; ++$i) {
+                // Need to make handling of result and solve details for FMC vs. non FMC a subroutine!
                 $solveDetails .= prettyNumber(number_format(floatval($resultRow['solve'.$i]), 2, '.', '')) . ", ";
             }
             $solveDetails = substr($solveDetails, 0, strlen($solveDetails) - 2);
@@ -31,9 +32,6 @@
             $timeMBLD = prettyNumber(round($rezult['1']));
             $solveDetails = $rezult['2'] . "/" . $rezult['3'] . " in " . $timeMBLD;
             $solveDetails = substr($solveDetails, 0, strlen($solveDetails) - 3);
-        } elseif ($eventId == 17) { // FMC
-            $result = round($resultRow['result']);
-            $solveDetails = stripslashes($resultRow['fmcSolution']);
         }			
 
         echo ": [I]($solveDetails)[/I] = [B]".$result."[/B]";

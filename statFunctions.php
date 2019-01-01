@@ -9,9 +9,26 @@
         return false;
     }
     
+    function is_fewest_moves($eventId)
+    {
+        if ($eventId == 17 || $eventId == 32)
+        {
+            return true;
+        }
+        return false;
+    }
+    
     function is_average_event($eventId)
     {
-        if ($eventId <= 6 || ($eventId >= 14 && $eventId <= 16) || ($eventId >= 22 && $eventId <= 27) || ($eventId >= 29 && $eventId <= 31)) {
+        if ($eventId <= 6 || ($eventId >= 14 && $eventId <= 17) || ($eventId >= 22 && $eventId <= 27) || ($eventId >= 29 && $eventId <= 31) || ($eventId >= 33 && $eventId <= 34)) {
+            return true;
+        }
+        return false;
+    }
+    
+    function is_wca_event($eventId)
+    {
+        if ($eventId <= 6 || ($eventId >= 8 && $eventId <= 10) || ($eventId >= 13 && $eventId <= 15) || ($eventId == 17) || ($eventId >= 22 && $eventId <= 26)) {
             return true;
         }
         return false;
@@ -55,11 +72,20 @@
             case 30:
                 if ($year > 2016) { return false; } break;  // Magics - valid only through 2016
             case 31:
+                if ($year !== 2009) { return false; } break;  // Snake - valid only in the year 2009
             case 32:
-                if ($year !== 2009) { return false; } break;  // Snake and 4x4x4 Fewest Moves - valid only in the year 2009
+                if ($year < 2008 || $year > 2009) { return false; } break;  // 4x4x4 Fewest Moves - valid only 2008 - 2009
+            case 33:
+            case 34:
+                if ($year < 2019) { return false; } break;  // Redi Cube and Master Pyraminx valid from 2019 to present
         }
 
         return true;
+    }
+    
+    function wca_event_count()
+    {
+        return 18;
     }
     
     function get_competition_name($week, $year)
@@ -67,7 +93,7 @@
         return $year."-".str_pad($week, 2, '0', STR_PAD_LEFT);
     }
     
-    function get_weekly_kinch_rankings($week, $year)
+    function get_weekly_kinch_rankings($week, $year, $wcaOnly)
     {
         global $mysqli;
         
@@ -76,7 +102,7 @@
         $results = $mysqli->query("select distinct userId from weeklyResults where weekId=".$week." and yearId=".$year);
         while ($row = $results->fetch_row()) {
             $userId = $row[0];
-            $kinchTotals[$userId] = get_weekly_user_kinch_score($userId, $week, $year);
+            $kinchTotals[$userId] = get_weekly_user_kinch_score($userId, $week, $year, $wcaOnly);
         }
         arsort($kinchTotals);
         return $kinchTotals;
@@ -95,14 +121,14 @@
         return $rank.$place;
     }
     
-    function get_weekly_user_kinch_score($user, $week, $year)
+    function get_weekly_user_kinch_score($user, $week, $year, $wcaOnly)
     {
         $userRecords = get_user_weekly_results($user, $week, $year);
         $overallRecords = get_overall_records();
         $score = 0;
         $count = 0;
         foreach ($userRecords as $eventId => $result) {
-            if (is_active_event($eventId, $week, $year)) {
+            if (($wcaOnly && is_wca_event($eventId)) || (!$wcaOnly && is_active_event($eventId, $week, $year))) {
                 $score += calculate_kinch_event_score($overallRecords[$eventId], $result, $eventId);
                 ++$count;
             }
@@ -116,7 +142,7 @@
 
         global $mysqli;
         global $events;
-        foreach ($events as $eventId) {
+        foreach ($events as $eventId => $eventName) {
             if ($eventId == '13') {
                 $result = $mysqli->query("select multiBLD from weeklyResults where userId=".$user." and eventId=13 and weekId=".$week." and yearId=".$year);
             } else {
@@ -129,7 +155,7 @@
         return $records;
     }
 
-    function get_overall_user_kinch_scores($user)
+    function get_overall_user_kinch_scores($user, $wcaOnly)
     {
         $userRecords = get_user_records($user);
         $overallRecords = get_overall_records();
@@ -137,7 +163,7 @@
         $count = 0;
         foreach ($userRecords as $eventId => $result) {
             $scores[$eventId] = calculate_kinch_event_score($overallRecords[$eventId], $result, $eventId);
-            if (is_active_event($eventId, get_current_week(), get_current_year())) {
+            if (($wcaOnly && is_wca_event()) || (!$wcaOnly && is_active_event($eventId, get_current_week(), get_current_year()))) {
                 $score += $scores[$eventId];
                 ++$count;
             }
@@ -153,7 +179,7 @@
         global $events;
         
         if (count($records) === 0) {
-            foreach ($events as $eventId) {
+            foreach ($events as $eventId => $eventName) {
                 if ($eventId == '13') {
                     $result = $mysqli->query("select min(multiBLD) from weeklyResults where userId=".$user." and eventid=13");
                 } else {
@@ -197,7 +223,7 @@
             return $records;
         }
         
-        foreach ($events as $eventId) {
+        foreach ($events as $eventId => $eventName) {
             if ($eventId == '13') {
                 $result = $mysqli->query("select min(multiBLD) from weeklyResults where eventid=13");
             } else {
@@ -250,30 +276,6 @@
         return $personInfo;
     }
 
-    function get_event_info($eventId)
-    {
-        static $eventNames = array();
-        static $solveCounts = array();
-        global $mysqli;
-
-        if (!array_key_exists($eventId, $eventNames)) {
-            // Get all the events into the static arrays above with a single SELECT, and then just look inside the array for any future requests
-            $query = $mysqli->query("SELECT id, eventName, weekly FROM events");
-            while ($row = $query->fetch_assoc()) {
-                $currentId = $row['id'];
-                $eventNames[$currentId] = $row['eventName'];
-                $solveCounts[$currentId] = $row['weekly'];
-                if ($row['weekly'] > 5) {
-                    // multiBLD
-                    $solveCounts[$currentId] = 1;
-                }
-            }
-        }
-
-        $eventInfo = array('eventName' => $eventNames[$eventId], 'solveCount' => $solveCounts[$eventId]);
-        return $eventInfo;
-    }
-    
     function round_score($score)
     {
         return number_format($score, 2, '.', '');
@@ -417,6 +419,8 @@
             case "Master Magic": echo '<span class="cubing-icon '.$size.' event-mmagic"></span>'; break;
             case "Snake": echo '<span class="cubing-icon '.$size.' event-minx"></span>'; break;
             case "4x4x4 Fewest Moves": echo '<span class="cubing-icon '.$size.' event-333fm"></span>'; break;
+            case "Redi Cube": echo '<span class="cubing-icon '.$size.' unofficial-redi"></span>'; break;
+            case "Master Pyraminx": echo '<span class="cubing-icon '.$size.' unofficial-masterpyram"></span>'; break;
         }
     }
     
@@ -472,43 +476,15 @@
         }
     }
     
-    function calculate_place_ranking($eventId, $rankResult, $userId, $week, $year)
+    function calculate_place_ranking($eventId, $rankAverage, $rankBest, $userId, $week, $year)
     {
         global $mysqli;
         $place = 1;
-        if ($eventId != 13) {
-            $queryRanking = $mysqli->query("SELECT DISTINCT userId, result FROM weeklyResults WHERE weekId = $week AND yearId = $year AND eventId = $eventId AND result < $rankResult AND userID >= 0 AND userId != $userId");
-        } else {
-            $queryRanking = $mysqli->query("SELECT DISTINCT userId, multiBLD FROM weeklyResults WHERE weekId = $week AND yearId = $year AND eventId = $eventId AND multiBLD < $rankResult AND userID >= 0 AND userId != $userId");
-        }
+        $queryRanking = $mysqli->query("SELECT average, best FROM weeklyResults WHERE weekId = $week AND yearId = $year AND eventId = $eventId AND (average < $rankAverage OR (average = $rankAverage AND best < $rankBest)) AND userId != $userId");
         while($placeArr = $queryRanking->fetch_array()){
             // For some reason, WHERE result < $rankResult returns cases where result == $rankResult, so I need the following check.  Bizarre.
-            if ($rankResult !== $placeArr['result']) {
+            if ($rankAverage !== $placeArr['average'] || ($rankAverage == $placeArr['average'] && $rankBest !== $placeArr['best'])) {
                 $place++;
-            }
-        }
-        return $place;
-    }
-    
-    function calculate_place_ranking_new($eventId, $rankAverage, $rankBest, $userId, $week, $year)
-    {
-        global $mysqli;
-        $place = 1;
-        if (is_average_event($eventId)) {
-            $queryRanking = $mysqli->query("SELECT average, best FROM weeklyResults WHERE weekId = $week AND yearId = $year AND eventId = $eventId AND average > 0 AND (average < $rankAverage OR (average = $rankAverage AND best < $rankBest)) AND userId != $userId");
-            while($placeArr = $queryRanking->fetch_array()){
-                // For some reason, WHERE result < $rankResult returns cases where result == $rankResult, so I need the following check.  Bizarre.
-                if ($rankAverage !== $placeArr['average'] || ($rankAverage == $placeArr['average'] && $rankBest !== $placeArr['best'])) {
-                    $place++;
-                }
-            }
-        } else {
-            $queryRanking = $mysqli->query("SELECT best FROM weeklyResults WHERE weekId = $week AND yearId = $year AND eventId = $eventId AND best > 0 AND best < $rankBest AND userId != $userId");
-            while($placeArr = $queryRanking->fetch_array()){
-                // For some reason, WHERE result < $rankResult returns cases where result == $rankResult, so I need the following check.  Bizarre.
-                if ($rankBest !== $placeArr['best']) {
-                    $place++;
-                }
             }
         }
         return $place;
@@ -532,26 +508,26 @@
     
     function get_FMC_output($result)
     {
-        if ($result == 8888 || $result == 0) {
+        if ($result == 8888) {
             $output = "DNF";
+        } elseif ($result == 9999 || $result == 0) {
+            $output = "DNS";
         } else {
             $output = round($result);
         }
         return $output;
     }
     
-    function get_solve_details($eventId, $solveCount, $solves, $result, $multiBLD, $fmcSolution, $short)
+    function get_solve_details($eventId, $solveCount, $solves, $result, $multiBLD, $short)
     {
         if ($eventId == 13) {
             $multiBLDInfo = number_to_MBLD($multiBLD);
             $time = substr(pretty_number($multiBLDInfo[1]), 0, -3);
             $solveDetails = $multiBLDInfo[2]."/".$multiBLDInfo[3]." ".$time;
-        } elseif ($eventId == 17) {
-            $solveDetails = stripslashes($fmcSolution);
         } else {
             $solveDetails = "";
             for ($i = 1; $i <= $solveCount; $i++) {
-                $solveDetails .= pretty_number($solves[$i]);
+                $solveDetails .= get_single_output($eventId, $solves[$i]);
                 if ($short && $i < $solveCount) {
                     $solveDetails .= ", ";
                 } elseif ($i < $solveCount) {
@@ -693,6 +669,12 @@
             case 26: $participation = 2; break;
             case 27: $participation = 2; break;
             case 28: $participation = 4; break;
+            case 29: $participation = 2; break;
+            case 30: $participation = 2; break;
+            case 31: $participation = 2; break;
+            case 32: $participation = 10; break;
+            case 33: $participation = 3; break;
+            case 34: $participation = 4; break;
             default: $participation = 2; break;
         }
         if (!$bldComplete) { $participation = 0; }
@@ -789,6 +771,12 @@
             case 26: return "Skewb";
             case 27: return "Kilominx";
             case 28: return "Mini Guildford";
+            case 29: return "Magic";
+            case 30: return "Master Magic";
+            case 31: return "Snake";
+            case 32: return "4x4x4 FMC";
+            case 33: return "Redi Cube";
+            case 34: return "Master Pyrmx";
             default: return "Error: unknown event!";
         }
     }
@@ -808,7 +796,7 @@
                 $id = $row['id'];
                 $this->eventNames[$id] = $row['eventName'];
                 $this->eventIds[$id] = intval($row['id']);
-                $this->numSolves[$id] = $row['weekly'];
+                $this->numSolves[$id] = intval($row['weekly']);
                 if ($this->initial == -1) {
                     $this->initial = $id;
                 }
@@ -823,7 +811,7 @@
         }
         
         public function current() {
-            return $this->eventIds[$this->position];
+            return $this->eventNames[$this->position];
         }
         
         public function key() {
@@ -858,6 +846,7 @@
     {
         private $totalScores = array();     // array of overall scores indexed by user id
         private $kinchScores = array();     // array of Kinch scores indexed by user id
+        private $kinchScoresWca = array();  // array of Kinch scores for WCA events only indexed by user id
         private $userIds = array();         // array of numeric user ids
         private $results = array();         // array of arrays, one per event, of result value indexed by user
         private $solveDetails = array();    // array of arrays, one per event, of solve details indexed by user
@@ -867,6 +856,7 @@
         private $partials = array();        // array of arrays, one per user id, of whether event is started, indexed by event id; zero event entry is total count of all events started
         private $completeds = array();      // array of arrays, one per user id, of whether event is completed, indexed by event id; zero event entry is total count of all events completed
         private $overallRecords = array();  // array of overall best results, indexed by event
+        private $partialsWca = array();     // array of count of WCA events that have been started, indexed by user id
         
         public function __construct($week, $year)
         {
@@ -874,11 +864,11 @@
             global $events;
             $events = new Events; // try passing this by reference to the constructor?
             $overallRecords = get_overall_records();
-            foreach ($events as $eventId) {
+            foreach ($events as $eventId => $eventName) {
                 if (!is_active_event($eventId, $week, $year)) {
                     continue;
                 }
-                $solveCount = $events->num_solves($eventId);
+                $solveCount = get_solve_count($eventId, $year);
                 $currentRank = 1;
                 $userPlace = 0;
                 $prevAverage = 0;
@@ -886,7 +876,7 @@
                 $prevUser = 0;
                 $ties = 0;
                 $tieCorrections = array();  // temporary array indicating amount for each user to correct for tie
-                $query = $mysqli->query("SELECT userId, result, comment, solve1, solve2, solve3, solve4, solve5, multiBLD, fmcSolution, average, best FROM weeklyResults WHERE eventId='$eventId' AND weekId='$week' AND yearId='$year' ORDER BY ".get_order_by_string($eventId));
+                $query = $mysqli->query("SELECT userId, result, comment, solve1, solve2, solve3, solve4, solve5, multiBLD, average, best FROM weeklyResults WHERE eventId='$eventId' AND weekId='$week' AND yearId='$year' ORDER BY ".get_order_by_string($eventId));
                 $numResults = $query->num_rows;
                 while ($resultRow = $query->fetch_array()) {
                     $cubesMBLD = 0;
@@ -894,7 +884,6 @@
                     $result = 0;
                     $userId = $resultRow['userId'];
                     $multiBLD = $resultRow['multiBLD'];
-                    $fmcSolution = $resultRow['fmcSolution'];
                     $this->userIds[$userId] = $userId;
                     for ($i = 1; $i <= $solveCount; ++$i) {
                         $solves[$i] = $resultRow['solve'.$i];
@@ -924,7 +913,7 @@
                     $userPlace = $currentRank - $ties;
                     $currentRank++;
 
-                    if ($eventId !== 13 && $eventId !== 17) { // regular event
+                    if ($eventId !== 13) { // regular event
                        for($i = 1; $i <= $solveCount; $i++){
                            $finishedSolves += ($resultRow['solve'.$i] != 0 && $resultRow['solve'.$i] != 9999) ? 1 : 0;
                         }
@@ -935,7 +924,7 @@
                         }
                     }
                     $result = get_single_output($eventId, $eventId == 13 ? $resultRow['multiBLD'] : $resultRow['result']);
-                    $this->solveDetails[$eventId][$userId] = get_solve_details($eventId, $solveCount, $solves, $result, $multiBLD, $fmcSolution, true);
+                    $this->solveDetails[$eventId][$userId] = get_solve_details($eventId, $solveCount, $solves, $result, $multiBLD, true);
 
                     // Set BLD scoring flags
                     $bldComplete = $result ? 1 : 0;
@@ -954,7 +943,10 @@
                         $this->totalScores[$userId] += $score;
                         if (is_valid_score($result)) {
                             $kinchResult = ($eventId == 13) ? $multiBLD : ugly_number($result);
-                            $this->kinchScores[$userId] += calculate_kinch_event_score($overallRecords[$eventId], $kinchResult, $eventId);
+                            $this->kinchScores[$userId] += calculate_kinch_event_score($overallRecords[$eventId], $kinchResult, $eventId, false);
+                            if (is_wca_event($eventId)) {
+                                $this->kinchScoresWca[$userId] += calculate_kinch_event_score($overallRecords[$eventId], $kinchResult, $eventId, false);
+                            }
                         }
                     }
 
@@ -966,7 +958,10 @@
                     if ($result || ($this->solveDetails[$eventId][$userId] !== "" && $eventId === 13)) {
                         $this->partials[$userId][$eventId] = true;
                         ++$this->partials[$userId][0];
-                        if ($eventId == 13 || $eventId == 17 || $finishedSolves == $solveCount) {
+                        if (is_wca_event($eventId)) {
+                            ++$this->partialsWca[$userId];
+                        }
+                        if ($eventId == 13 || $finishedSolves == $solveCount) {
                             $this->completeds[$userId][$eventId] = true;
                             ++$this->completeds[$userId][0];
                         }
@@ -996,23 +991,25 @@
             
             foreach ($this->userIds as $userId) {
                 $this->kinchScores[$userId] /= 28;
+                $this->kinchScoresWca[$userId] /= wca_event_count();
             }
             unset($this->totalScores[0]);
             unset($this->totalScores['']);
             arsort($this->totalScores);
             arsort($this->kinchScores);
+            arsort($this->kinchScoresWca);
         }
         
         public function print_bbcode_results()
         {
             global $events;
             echo "<br>";
-            foreach ($events as $eventId) {
+            foreach ($events as $eventId => $eventName) {
                 if (count($this->scores[$eventId]) == 0) {
                     continue;
                 }
                 $i = 1;
-                echo "[B]".$events->name($eventId)."[/B](".count($this->scores[$eventId]).")<br>";
+                echo "[B]".$eventName."[/B](".count($this->scores[$eventId]).")<br>";
                 echo "[LIST=1]<br>";
                 if ($eventId == 13) {
                     foreach ($this->solveDetails[$eventId] as $key=>$value) {
@@ -1110,6 +1107,11 @@
             return $this->kinchScores;
         }
         
+        public function get_kinch_scores_wca()
+        {
+            return $this->kinchScoresWca;
+        }
+        
         public function get_results($eventId)
         {
             return $this->results[$eventId];
@@ -1123,6 +1125,11 @@
         public function get_attempted_events($userId)
         {
             return $this->partials[$userId][0];
+        }
+        
+        public function get_attempted_events_wca($userId)
+        {
+            return $this->partialsWca[$userId];
         }
         
         public function is_completed($eventId, $userId)
@@ -1139,7 +1146,7 @@
     function get_order_by_string($eventId)
     {
         global $events;
-        if ($events->num_solves($eventId) == 5) {
+        if (is_average_event($eventId)) {
             return "average, best";
         }
         return "best";
@@ -1149,7 +1156,7 @@
     {
         global $mysqli;
         global $events;
-        foreach ($events as $eventId) {
+        foreach ($events as $eventId => $eventName) {
             $queryString = "SELECT userId, average, best FROM weeklyResults where weekId = $week AND yearId = $year AND eventId = $eventId ORDER BY ".get_order_by_string($eventId);
             $query = $mysqli->query($queryString);
             $rank = 1;
@@ -1186,9 +1193,9 @@
         print $year."--".$week."<br>";
         
         if ($week === 0) {
-            $queryString = "SELECT eventId, userId, weekId, result, solve1, solve2, solve3, solve4, solve5, multiBLD, fmcSolution FROM weeklyResults WHERE yearId = $year";
+            $queryString = "SELECT eventId, userId, weekId, result, solve1, solve2, solve3, solve4, solve5, multiBLD FROM weeklyResults WHERE yearId = $year";
         } else {
-            $queryString = "SELECT eventId, userId, weekId, result, solve1, solve2, solve3, solve4, solve5, multiBLD, fmcSolution FROM weeklyResults WHERE yearId = $year AND weekId = $week";
+            $queryString = "SELECT eventId, userId, weekId, result, solve1, solve2, solve3, solve4, solve5, multiBLD FROM weeklyResults WHERE yearId = $year AND weekId = $week";
         }
         $query = $mysqli->query($queryString);
         while ($row = $query->fetch_array()) {
@@ -1196,7 +1203,7 @@
             $userId = $row['userId'];
             $week = $row['weekId'];
             $solves = array();
-            $solveCount = $events->num_solves($eventId);
+            $solveCount = get_solve_count($eventId, $year);
             $best = PHP_INT_MAX;
             $completed = 0;
             for ($i = 1; $i <= $solveCount; ++$i) {
@@ -1242,7 +1249,7 @@
     {
         $solveCount = count($solves);
         if ($solveCount == 3 && $completed == 3) {
-            return round_score(array_sum($solves) / 3) * 100;
+            return round((array_sum($solves) / 3) * 100);
         } elseif ($solveCount == 5 && $completed >= 4) {
             $resMin = PHP_INT_MAX;
             for ($i = 1; $i <= $solveCount; ++$i) {
@@ -1251,7 +1258,7 @@
                 }
             }
             $resMax = max($solves);
-            return round_score((array_sum($solves) - $resMin - $resMax) / 3) * 100; // avg5
+            return round(((array_sum($solves) - $resMin - $resMax) / 3) * 100); // avg5
         } elseif ($solveCount == 3 || $solveCount == 5) {
             // max average for events that take averages
             return PHP_INT_MAX;
@@ -1267,7 +1274,7 @@
 
         if ($showPersons) {
             if ($showSingles) {
-                $queryString = "SELECT userId, result, weekId, yearId, solve1, solve2, solve3, solve4, solve5, multiBLD, fmcSolution, average, best AS min FROM weeklyResults AS current
+                $queryString = "SELECT userId, result, weekId, yearId, solve1, solve2, solve3, solve4, solve5, multiBLD, average, best AS min FROM weeklyResults AS current
                                        WHERE eventId = $event $yearsLimitString $userLimitString
                                        AND best != $maxInt
                                        AND NOT EXISTS (SELECT userId, best FROM weeklyResults AS better
@@ -1275,8 +1282,8 @@
                                                                 AND better.best < current.best
                                                                 AND better.userId = current.userId)
                                        ORDER BY best";
-            } elseif ($events->num_solves($event) >= 3) {
-                $queryString = "SELECT userId, result, weekId, yearId, solve1, solve2, solve3, solve4, solve5, multiBLD, fmcSolution, average AS min, best FROM weeklyResults AS current
+            } else {
+                $queryString = "SELECT userId, result, weekId, yearId, solve1, solve2, solve3, solve4, solve5, multiBLD, average AS min, best FROM weeklyResults AS current
                                        WHERE eventId = $event $yearsLimitString $userLimitString
                                        AND average != $maxInt
                                        AND NOT EXISTS (SELECT userId, average, best FROM weeklyResults AS better
@@ -1287,12 +1294,12 @@
             }
         } else {
             if ($showSingles) {
-                $queryString = "SELECT userId, result, weekId, yearId, solve1, solve2, solve3, solve4, solve5, multiBLD, fmcSolution, average, best AS min FROM weeklyResults AS current
+                $queryString = "SELECT userId, result, weekId, yearId, solve1, solve2, solve3, solve4, solve5, multiBLD, average, best AS min FROM weeklyResults AS current
                                        WHERE eventId = $event $yearsLimitString $userLimitString
                                        AND best != $maxInt
                                        ORDER BY best $limitString";
-            } elseif ($events->num_solves($event) >= 3) {
-                $queryString = "SELECT userId, result, weekId, yearId, solve1, solve2, solve3, solve4, solve5, multiBLD, fmcSolution, average AS min, best FROM weeklyResults AS current
+            } else {
+                $queryString = "SELECT userId, result, weekId, yearId, solve1, solve2, solve3, solve4, solve5, multiBLD, average AS min, best FROM weeklyResults AS current
                                        WHERE eventId = $event $yearsLimitString $userLimitString
                                        AND average != $maxInt
                                        ORDER BY average, best $limitString";
@@ -1303,7 +1310,7 @@
     }
     
     function is_valid_score($score) {
-        if ($score !== 0 && $score !== 8888 && $score !== 9999 && $score !== '0' && $score !== '8888' && $score !== '9999' && $score !== 'DNF' && $score !== 'DNS' && $score !== '' && $score !== '0.00') {
+        if ($score !== 0 && $score !== 8888 && $score !== 9999 && $score !== '0' && $score !== '8888' && $score !== '9999' && $score !== 'DNF' && $score !== 'DNS' && $score !== '' && $score !== '0.00' && $score !== PHP_INT_MAX && $score !== '2147483647') {
             return true;
         }
         return false;
@@ -1329,6 +1336,18 @@
             }
         }
         return $max;
+    }
+    
+    function get_solve_count($eventId, $year)
+    {
+        global $events;
+        
+        if ($eventId == 17 && ($year > 2018)) {
+            // Beginning in 2019 we changed to 3 solves for fewest moves
+            return 3;
+        }
+        
+        return $events->num_solves($eventId);
     }
     
     function get_decorated_diff($old, $new){
@@ -1365,17 +1384,17 @@
         $scramble = substr($scramble, 20);
         echo "<div>Week ".$year."-".$week."<br>";
         echo "Scramble:<br>".$scramble."<br>";
-        $queryResults = $mysqli->query("SELECT userId, fmcSolution FROM weeklyResults WHERE eventId = 17 AND weekId = $week AND yearId = $year");
+        $queryResults = $mysqli->query("SELECT userId, solution FROM weeklyFmcSolves WHERE eventId = 17 AND weekId = $week AND yearId = $year");
         while ($results = $queryResults->fetch_array()) {
-            $solution = correct_solution($results['fmcSolution']);
+            $solution = correct_solution($results['solution']);
             $fmcValue = FMCsolve($scramble, $solution);
             if ($fmcValue > 0) {
             echo $results['userId'].": (".$fmcValue.") ".$solution."<br>";
             } else {
                 echo "<div  class='dnf-text'>".$results['userId'].": (".$fmcValue.") ".$solution."</div>";
             }
-            if ($solution != $results['fmcSolution']) {
-            $diff = get_decorated_diff($results['fmcSolution'], $solution);
+            if ($solution != $results['solution']) {
+            $diff = get_decorated_diff($results['solution'], $solution);
             echo "<div>".$diff['old']."</div>
                   <div>".$diff['new']."</div>";
             }

@@ -30,6 +30,8 @@ Notation and scrambling:
 [*]For Pyraminx, small letters are for the tips
 [*]Skewb scrambles are generated using Chen Shuang's scrambler, which uses [url="http://meep.cubing.net/skewb-fcn.html"]Fixed Corner Notation[/url].
 [*]Kilominx scrambles uses the notation for Megaminx.
+[*]Redi Cube scrambles are generated using xyzzy's scrambler, which uses the older style Rubiks'kewb notation.
+[*]For Master Pyraminx, a "w" means "wide so that you turn 3 of the 4 layers.  As with Pyraminx, lowercase moves are for the tips.
 [/LIST]
 
 This competition starts now and ends Monday/Tuesday nightchange GMT (officially).  Automated results will close at the official time, but if you are slightly late, go ahead and post your results here and we will include them at our discretion if we think it's reasonable.

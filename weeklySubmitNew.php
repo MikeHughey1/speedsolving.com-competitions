@@ -45,12 +45,11 @@ EOD;
         echo "<div id='weeklySubmitPage' hidden>";
         global $events;
         $weeklyResults = new WeeklyResults($weekNo, $yearNo);
-	foreach ($events as $eventId) {
-            if ($eventId > 28) {
+	foreach ($events as $eventId => $eventName) {
+            if (!is_active_event($eventId, $weekNo, $yearNo)) {
                 continue;
             }
-            $eventName = $events->name($eventId);
-            $solveCount = $events->num_solves($eventId);
+            $solveCount = get_solve_count($eventId, $yearNo);
 
             // Figure out how done we are on this event
             $partial = $weeklyResults->is_partial($eventId, $userId);
@@ -64,7 +63,7 @@ EOD;
             }
 
             echo "<div class='submit-weekly'>";
-            $results = $mysqli->query("SELECT eventId, result, comment, solve1, solve2, solve3, solve4, solve5, multiBLD, fmcSolution FROM weeklyResults WHERE userId='$userId' AND eventId='$eventId' AND weekId='$weekNo' AND yearId='$yearNo'")->fetch_array();
+            $results = $mysqli->query("SELECT eventId, result, comment, solve1, solve2, solve3, solve4, solve5, multiBLD FROM weeklyResults WHERE userId='$userId' AND eventId='$eventId' AND weekId='$weekNo' AND yearId='$yearNo'")->fetch_array();
             $scramble = $mysqli->query("SELECT scramble FROM scrambles WHERE eventId='$eventId' AND weekId='$weekNo' AND yearId='$yearNo'")->fetch_array();
             echo "<div class='event-header'><span class='result-info close-left'>";
             add_icon($eventName, "cubing-icon");
@@ -123,15 +122,24 @@ EOD;
             }
 		
             /* FMC GOES HERE */
-            elseif ($eventId==17) { 
-                $solveResult = stripslashes($results['fmcSolution']);
-                echo "<div class='data-panel times-window'>";
-                echo "Solution:<br>[please use official WCA notation,<br>Rw for wide turns, xyz for rotations etc,<br>moves are automatically counted]";
-                print "<textarea class='submit-weekly-comment' name='weekly".$eventId."Time1'>".$solveResult."</textarea><br />";
-                echo "</div>";
-                echo "<div class='data-panel comment-window'>";
+            elseif ($eventId==17) {
+                echo "<div class='data-panel'>";
+                echo "Please use official WCA notation: Rw for wide turns, xyz for rotations, etc.;<br>moves are automatically counted.<br><br>";
+                echo "</div><div></div>";
+                $results = $mysqli->query("SELECT comment FROM weeklyResults WHERE userId='$userId' AND eventId='$eventId' AND weekId='$weekNo' AND yearId='$yearNo'")->fetch_array();
                 $comment = str_ireplace("<br />","\n",stripslashes($results['comment']));
-                echo "Comment: <br />  <textarea class='submit-weekly-comment' name='weeklyComment$eventId'>$comment</textarea>";
+                for ($solveId = 1; $solveId <= $solveCount; ++$solveId) {
+                    echo "<div class='data-panel comment-window'>";
+                    $fmcResults = $mysqli->query("SELECT solution, comment FROM weeklyFmcSolves WHERE yearId = '$yearNo' AND weekId = '$weekNo' AND userId = '$userId' AND eventId = '$eventId' AND solveId = '$solveId'")->fetch_array();
+                    $solveResult = str_replace(array("’", "‘", "´", "\x91", "\x92"), "'", stripslashes($fmcResults['solution']));
+                    echo "Solution ".$solveId.":";
+                    print "<textarea class='submit-weekly-comment' name='weeklySolution".$solveId."'>".$solveResult."</textarea><br />";
+                    $solutionExplanation = str_replace(array("’", "‘", "´", "\x91", "\x92"), "'", str_ireplace("<br />","\n",stripslashes($fmcResults['comment'])));
+                    echo "Explanation for Solution ".$solveId.":<br /><textarea class='submit-weekly-comment' name='weeklySolutionExplanation".$solveId."'>$solutionExplanation</textarea>";
+                    echo "</div>";
+                }
+                echo "<div>";
+                echo "Overall Comment: <br />  <textarea class='submit-weekly-comment' name='weeklyComment$eventId'>$comment</textarea>";
             }
 		
             /* REST GOES HERE */
@@ -202,10 +210,13 @@ EOD;
 <script>
     <?php
         $events = new Events();
-        foreach ($events as $eventId) {
+        foreach ($events as $eventId => $eventName) {
+            if (!is_active_event($eventId, $weekNo, $yearNo)) {
+                continue;
+            }
             $eventIds[] = $eventId;
-            $solveCounts[] = $events->num_solves($eventId);
-            $eventNames[] = $events->name($eventId);
+            $eventNames[] = $eventName;
+            $solveCounts[] = get_solve_count($eventId, $yearNo);
         }
         echo "var eventIds = ".json_encode($eventIds).";\n";
         echo "    var solveCounts = ".json_encode($solveCounts).";\n";
@@ -278,7 +289,7 @@ EOD;
             // For FMC, preprocess solution to make sure it is valid.
             solution = "";
             if (eventId == 17) {
-                solution = document.getElementsByName("weekly" + eventId + "Time1")[0].value;
+                solution = document.getElementsByName("weeklySolution1")[0].value;
                 if (solution == "DNF") {
                     hasDNF = true;
                 } else if (solution != "" && solution != "DNS") {
@@ -297,7 +308,7 @@ EOD;
                         alert(alertString);
                         return false;
                     } else {
-                        document.getElementsByName("weekly" + eventId + "Time1")[0].value = solution;
+                        document.getElementsByName("weeklySolution1")[0].value = solution;
                     }
                 }
             } else {
@@ -329,7 +340,7 @@ EOD;
                 return false;
             }
             if (eventId == 17) {
-                solution = document.getElementsByName("weekly" + eventId + "Time1")[0].value;
+                solution = document.getElementsByName("weeklySolution1")[0].value;
                 if (solution != "" && solution != "DNS") {
                     event.preventDefault();
                     alertString = "Please enter a comment.\n\nAll fewest moves solutions require a comment that explains how you obtained the solution.\n\n";

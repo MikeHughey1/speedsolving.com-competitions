@@ -32,7 +32,7 @@
     echo "<div id='headerTextMobile' class='header-text'><span id='myNameMobile'></span><span>:</span><span class='header-score' id='totalScoreMobile'><b></b></span><span> points   </span><span class='header-score' id='overallPlaceMobile'><b></b></span><span> place</span></div>";
     if (($weekNo == get_current_week() && $yearNo == get_current_year() && $userId == $_SESSION['logged_in']) || is_admin()) {
         if ($userId != $_SESSION['logged_in']) { echo "Logged in as user id=".$userId; }
-        foreach ($events as $eventId) {
+        foreach ($events as $eventId => $eventName) {
             if (!is_active_event($eventId, $weekNo, $yearNo)) {
                 continue;
             }
@@ -52,7 +52,7 @@
             /* Output data */
             echo "<div class='view-info $styleMod'>";
             add_icon($events->name($eventId), "cubing-icon-5x");
-            echo "<div><div class='submit-weekly-header'><a href='showWeeks.php?selectEvent=".($eventId + 2)."'>".get_short_event_name($eventId)."</a></div></div>";
+            echo "<div><div class='submit-weekly-header'><a href='showWeeks.php?selectEvent=".($eventId)."'>".get_short_event_name($eventId)."</a></div></div>";
             if ($complete || $partial) {
                 $solveDetails = $weeklyResults->get_user_solve_details($eventId, $userId);
                 if (strlen($solveDetails) > 42) {
