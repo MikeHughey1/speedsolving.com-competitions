@@ -1,0 +1,29 @@
+These weekly competitions are sponsored by [url="http://www.thecubicle.com"]TheCubicle[/url] - check them out for all your speedcubing needs.
+
+Each week, a random competitor will be drawn and given a $15 giftcard to TheCubicle (winner's prize must be claimed within 30 days).
+
+For the weekly competition, we are now accepting results in three ways:
+1. Select the "Competition" menu choice above; the competition has been integrated into the Forum. It will allow you to compete under your Forum username, with no additional login necessary. You will need to be logged into the Forum to use the integrated site. Hopefully use of the website to enter your times will be self-explanatory, please contact Mike Hughey by PM on speedsolving.com if you have questions.
+2. Post in this thread, as usual.
+3. If you have competed prior to the integration with the Forum, continue to use the old site. Note that no further accounts will be created for the external website; if you have not already competed this way, you should use the integrated version with the "Competition" menu choice above instead.
+
+We follow the [url="http://www.worldcubeassociation.org/regulations/"]WCA regulations[/url] for all events. Here are some things that people often don't know, or are different from the regulations:
+
+[LIST]
+[*]For Multi-BLD you can choose how many cubes you are going to do (let me know if 70 scrambles is not enough). If you attempt 5 cubes you must use the first 5 scrambles.
+[*]For one-handed and with feet you can use both hands during inspection.
+[*]For 3x3x3 Fewest Moves there is a 1 hour time limit.  Provide an explanation in the comments describing how you arrived at your solution.
+[*]For relay you have 15 seconds of inspection in total, you can use any order to solve the cubes and the rest of the relay-rules should be obvious.
+[*]6x6x6 and 7x7x7 will use an average of 5.
+[/LIST]
+
+Notation and scrambling:
+[LIST]
+[*]For all WCA events, beginning in 2021 we are using the official TNoodle scramble generator to generate scrambles. Please see the [url="https://www.worldcubeassociation.org/regulations/#article-12-notation"]official WCA regulations[/url] for questions regarding scrambling notation.
+[*]Kilominx, Redi Cube, Master Pyraminx, and Face-Turning Octahedron random-state scramblers were provided by xyzzy (Thank You!). For FTO, to scramble, hold the puzzle with a corner facing you. The four faces visible to you together make a square. Orient the puzzle so that each of the four faces are directly above, below, to the left, and to the right of the corner facing you. These make up the U, F, L, and R faces, respectively. For the four faces on the back, B is adjacent to U, BL is adjacent to L, BR is adjacent to R, and D is adjacent to F. 
+[*]15 Puzzle scrambles are being provided using Ben Whitmore's random-state scrambler (Thank You!).
+[*]Curvy Copter random-state scrambler was provided by whatshisbucket (Thank You!). See the thread [url="https://www.speedsolving.com/threads/salow-notation-for-curvy-copter.74968/"]SALOW Notation for Curvy Copter[/url] for more explanation.
+[/LIST]
+
+This competition starts now and ends Monday/Tuesday nightchange GMT (officially).  Automated results will close at the official time, but if you are slightly late, go ahead and post your results here and we will include them at our discretion if we think it's reasonable.
+ 
