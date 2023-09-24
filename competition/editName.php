@@ -12,6 +12,9 @@
 <?php
     require_once '../competition_common/statFunctions.php';
 
+    $personInfo = sync\XF::user();
+    $currentUserId = $personInfo['id'];
+
     if (!is_admin()) {
         // Protect against someone inadvertently allowing this code to be called by a non-admin.  This shouldn't ever execute.
         print "ERROR: Do not allow editor to be used unless admin privileges have already been verified!";

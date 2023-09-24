@@ -354,7 +354,7 @@ function random_state()
 	let p = [0];
 	for (let i = 1; i < 20; i++)
 	{
-		let r = Math.floor(Math.random() * i);
+		let r = Math.floor(Math.random() * (i+1));
 		p[i] = p[r];
 		p[r] = i;
 	}

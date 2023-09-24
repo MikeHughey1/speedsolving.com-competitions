@@ -9,7 +9,17 @@
     $options = array("options" => array("regexp" => "/[a-zA-Z\ 0-9]*/"));
     $yearsSelected = filter_input(INPUT_GET, 'years', FILTER_VALIDATE_REGEXP, $options);
     $showSelected = filter_input(INPUT_GET, 'show', FILTER_VALIDATE_REGEXP, $options);
-    if (!$showSelected) {
+    // Temporary protection of security flaw
+    $yearsSelected = '';
+    if ($showSelected == '1000+Persons') {
+        $showSelected = '1000+Persons';
+    } else if ($showSelected == 'All Persons') {
+        $showSelected = 'All Persons';
+    } else if ($showSelected == '100+Results') {
+        $showSelected = '100+Results';
+    } else if ($showSelected == '1000+Results') {
+        $showSelected = '1000+Results';
+    } else {
         $showSelected = '100+Persons';
     }
     $showSingles = true;

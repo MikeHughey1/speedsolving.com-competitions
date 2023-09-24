@@ -184,6 +184,11 @@ EOD;
             $solveDetails = get_solve_details($eventId, get_solve_count($eventId, $year), $solves, $row['result'], $row['multiBLD'], false);
             $record = get_average_output($eventId, $year, $results[$type]);
         } else {
+            if ($eventId === 13) {
+                $queryDetails = $mysqli->query("SELECT multiBLD FROM weeklyResults WHERE weekId = $week AND yearId = $year AND eventId = $eventId AND userId = $userId");
+                $row = $queryDetails->fetch_array();
+                $solveDetails = get_solve_details($eventId, 0, 0, 0, $row['multiBLD'], false);
+            }
             $record = get_single_output_from_best($eventId, $results[$type]);
         }
         if ($count % 2 == 0) {

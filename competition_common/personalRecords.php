@@ -71,7 +71,9 @@ END;
         $yearWeeks[$eventId][$comp] = get_competition_name($week, $year);
         $comments[$eventId][$comp] = $resultRow['comment'];
         $results[$eventId][$comp] = $resultRow['result'];
-        $multiBLD[$comp] = 0;
+        if (!isset($multiBLD[$comp])) {
+            $multiBLD[$comp] = 0;
+        }
         if ($eventId == '13') {
             $multiBLD[$comp] = $resultRow['multiBLD'];
             $results[$eventId][$comp] = $resultRow['multiBLD'];
@@ -175,10 +177,17 @@ END;
             continue;
         }
         $pbSingleComp = $overallPBSingle[$eventId];
+        $weekId = substr($yearWeeks[$eventId][$pbSingleComp], 5);
+        $yearId = substr($yearWeeks[$eventId][$pbSingleComp], 0, 4);
         $solveCountSingle = get_solve_count($eventId, substr($yearWeeks[$eventId][$pbSingleComp], 0, 4));
         $singleRankString = calculate_single_ranking($eventId, $singles[$eventId][$pbSingleComp]);
         $solveDetails = get_solve_details($eventId, $solveCountSingle, $solves[$eventId][$pbSingleComp], $results[$eventId][$pbSingleComp], $multiBLD[$pbSingleComp], false);
-        $singleTipString = "Week ".$yearWeeks[$eventId][$pbSingleComp]."<br>$solveDetails<br>".$comments[$eventId][$pbSingleComp];
+        if (!is_average_event($eventId, $yearId) && ($yearId != get_current_year() || $weekId != get_current_week())) {
+            $place = $mysqli->query("SELECT rank FROM weeklyResults WHERE eventId='$eventId' AND weekId='$weekId' AND yearId='$yearId' AND userId='$userId'")->fetch_array()['rank'];
+            $singleTipString = "Week ".$yearWeeks[$eventId][$pbSingleComp]."<br>".get_place_string($place)." Place<br>$solveDetails<br>".$comments[$eventId][$pbSingleComp];
+        } else {
+            $singleTipString = "Week ".$yearWeeks[$eventId][$pbSingleComp]."<br>$solveDetails<br>".$comments[$eventId][$pbSingleComp];
+        }
         $singleOutput = get_single_output($eventId, $singles[$eventId][$overallPBSingle[$eventId]]);
         
         $pbAverageComp = $overallPBAverage[$eventId];
@@ -186,12 +195,12 @@ END;
         $yearId = substr($yearWeeks[$eventId][$pbAverageComp], 0, 4);
         $solveCount = get_solve_count($eventId, $yearId);
         $solveDetails = get_solve_details($eventId, $solveCount, $solves[$eventId][$pbAverageComp], $results[$eventId][$pbAverageComp], $multiBLD[$pbAverageComp], false);
-        $place = 1;
-        $queryRanking = $mysqli->query("SELECT userId FROM weeklyResults WHERE eventId='$eventId' AND weekId='$weekId' AND yearId='$yearId' AND result<'".$averages[$eventId][$pbAverageComp]."' AND userID>='0' AND userId!='$userId'");
-        while($placeArr = $queryRanking->fetch_array()){
-            $place++;
+        if (is_average_event($eventId, $yearId) && ($yearId != get_current_year() || $weekId != get_current_week())) {
+            $place = $mysqli->query("SELECT rank FROM weeklyResults WHERE eventId='$eventId' AND weekId='$weekId' AND yearId='$yearId' AND userId='$userId'")->fetch_array()['rank'];
+            $averageTipString = "Week ".$yearWeeks[$eventId][$pbAverageComp]."<br>".get_place_string($place)." Place<br>$solveDetails<br>".$comments[$eventId][$pbAverageComp];
+        } else {
+            $averageTipString = "Week ".$yearWeeks[$eventId][$pbAverageComp]."<br>$solveDetails<br>".$comments[$eventId][$pbAverageComp];
         }
-        $averageTipString = "Week ".$yearWeeks[$eventId][$pbAverageComp]."<br>".get_place_string($place)." Place<br>$solveDetails<br>".$comments[$eventId][$pbAverageComp];
         $averageRankString = calculate_average_ranking($eventId, $solveCount, $averages[$eventId][$pbAverageComp]);
 
         print "<tr>";

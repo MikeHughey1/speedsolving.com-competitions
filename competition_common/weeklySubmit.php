@@ -48,7 +48,7 @@ EOD;
         $weeklyResults = new WeeklyResults($weekNo, $yearNo);
         $eventIds = event_list();
         if (is_mike()) {
-            $eventIds = sorted_event_list_by_previous_week($weekNo, $yearNo);
+            //$eventIds = sorted_event_list_by_previous_week($weekNo, $yearNo);
         }
         foreach ($eventIds as $eventId) {
             $eventName = $events->name($eventId);

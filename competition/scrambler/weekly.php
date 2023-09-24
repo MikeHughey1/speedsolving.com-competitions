@@ -56,10 +56,10 @@ if ($row > 10) {
 <hr />
 
 //  generate scrambles for this week
-<script src="scramble_kilo.js?version=1"></script>
+<script src="scramble_kilo.js?version=2"></script>
 <script src="scramble_redi.js?version=1"></script>
 <script src="scramble_mpyram.js?version=1"></script>
-<script src="scramble_fto.js?version=1"></script>
+<script src="scramble_fto.js?version=4"></script>
 <script src="mersennetwister.js"></script> <!-- randomness -->
 <script>
 // list of eventId of all events in the database and then also in the forum weekly comps. 
